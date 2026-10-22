@@ -71,11 +71,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {uiTexts.navClasses || 'Classes & Fees'}
               </button>
               <button
-                onClick={() => setCurrentView('login', { intent: 'homework' })}
-                className={`whitespace-nowrap transition-colors hover:text-blue-600 flex items-center gap-1.5 ${currentView === 'login' ? 'text-blue-600 font-bold' : ''}`}
+                onClick={() => setCurrentView('homework-gate')}
+                className={`whitespace-nowrap transition-colors hover:text-blue-600 flex items-center gap-1.5 cursor-pointer ${currentView === 'homework-gate' ? 'text-blue-600 font-bold' : ''}`}
               >
                 <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                <span>Homework (Class Diary)</span>
+                <span>Homework</span>
               </button>
               <button
                 onClick={() => setCurrentView('about-teacher')}
@@ -229,11 +229,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentView('login', { intent: 'homework' })}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/90 rounded-xl transition-all shadow-2xs whitespace-nowrap cursor-pointer"
-                title="Daily Homework & Class Diary (Student & Admin Login)"
+                onClick={() => setCurrentView('homework-gate')}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all shadow-2xs whitespace-nowrap cursor-pointer"
+                title="Daily Homework (Students, Teachers & Admin)"
               >
-                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                 <span>Homework</span>
               </button>
               <button

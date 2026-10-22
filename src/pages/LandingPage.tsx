@@ -1,94 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { motion, useScroll } from 'motion/react';
 import { useUiText } from '../context/UiTextContext';
-import { BookOpen, GraduationCap, CheckCircle2, ArrowRight, Phone, MapPin, Users, Calendar, ShieldCheck, ChevronDown, ChevronUp, X, HelpCircle, MessageCircle } from 'lucide-react';
-
-const SUBJECTS = [
-  'Mathematics',
-  'Science',
-  'English',
-  'Hindi'
-];
-
-const FAQ_ITEMS = [
-  {
-    q: "How does daily homework submission and checking work?",
-    a: "After every physical lecture, the teacher publishes daily key concepts. Students solve the practice problems in their notebooks, upload photos or PDFs directly through their student login, and receive verified marks and corrections before the next day's lecture."
-  },
-  {
-    q: "Which classes and subjects are covered?",
-    a: "We provide comprehensive coaching for Mathematics, Science (Physics, Chemistry, Biology), English, and Hindi for Classes 8, 9, 10, 11, and 12 across CBSE, ICSE, and State Boards."
-  },
-  {
-    q: "How can parents and students track fee payments and attendance?",
-    a: "The portal automatically tracks attendance daily and provides computer-generated fee receipts, active membership validity dates, and advance renewal reminders with zero manual calculation errors."
-  },
-  {
-    q: "How can I contact for admissions or offline classroom visits?",
-    a: "You can reach out directly to AIHSAN ANSARI via phone or WhatsApp at +91 99058 47357 for trial class bookings, batch schedules, and fee details."
-  },
-  {
-    q: "Who provides login credentials for students and teachers?",
-    a: "All logins are generated and managed strictly by the Institute Owner through the administrative cabin to ensure authorized, secure access."
-  }
-];
-
-interface RollingCounterProps {
-  end: number;
-  decimals?: number;
-  suffix?: string;
-  duration?: number;
-}
-
-const RollingCounter: React.FC<RollingCounterProps> = ({
-  end,
-  decimals = 0,
-  suffix = '',
-  duration = 1800,
-}) => {
-  const [count, setCount] = useState(0);
-  const [key, setKey] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp: number | null = null;
-    let animId: number;
-
-    const step = (timestamp: number) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const elapsed = timestamp - startTimestamp;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setCount(ease * end);
-
-      if (progress < 1) {
-        animId = requestAnimationFrame(step);
-      } else {
-        setCount(end);
-      }
-    };
-
-    animId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animId);
-  }, [end, duration, key]);
-
-  // Periodic rolling animation every 7 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setKey((prev) => prev + 1);
-    }, 7000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <span
-      className="inline-block transition-transform duration-300 hover:scale-105 cursor-pointer"
-      onClick={() => setKey((k) => k + 1)}
-      title="Click to roll"
-    >
-      <span>{decimals > 0 ? count.toFixed(decimals) : Math.round(count)}</span>
-      <span>{suffix}</span>
-    </span>
-  );
-};
+import { 
+  GraduationCap, 
+  CheckCircle2, 
+  ArrowRight, 
+  Phone, 
+  MapPin, 
+  Users, 
+  BookOpen, 
+  ShieldCheck, 
+  X, 
+  MessageCircle,
+  Clock,
+  Sparkles
+} from 'lucide-react';
 
 interface LandingPageProps {
   onNavigate: (view: string, extra?: any) => void;
@@ -96,812 +22,570 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const { uiTexts } = useUiText();
-  const [subjectIndex, setSubjectIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const [enquirySubmitted, setEnquirySubmitted] = useState(false);
-  const [whatsappEnquiryUrl, setWhatsappEnquiryUrl] = useState('');
-  const [enquiryForm, setEnquiryForm] = useState({
-    studentName: '',
-    fatherName: '',
-    phone: '',
-    className: 'Class 10',
-    age: ''
-  });
+  const { scrollYProgress } = useScroll();
 
-  const parsedSubjects = (uiTexts.heroSubjects || 'Mathematics, Science, English, Hindi')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-  const subjectsList = parsedSubjects.length > 0 ? parsedSubjects : SUBJECTS;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setIsAnimating(true);
-      setTimeout(() => {
-        setSubjectIndex((prev) => (prev + 1) % subjectsList.length);
-        setIsAnimating(false);
-      }, 300);
-    }, 2200);
-
-    return () => clearInterval(timer);
-  }, [subjectsList.length]);
-
-  const handleEnquirySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanPhone = (uiTexts.contactPhone || '9905847357').replace(/\D/g, '');
-    const instituteBrand = uiTexts.brandName || 'Prerna Tuition';
-    const message = `*New Admission Enquiry - ${instituteBrand}*\n\n` +
-      `👤 *Student Name:* ${enquiryForm.studentName}\n` +
-      `👨‍👦 *Father Name:* ${enquiryForm.fatherName}\n` +
-      `📱 *Phone Number:* ${enquiryForm.phone}\n` +
-      `📚 *Class:* ${enquiryForm.className}\n` +
-      `🎂 *Age:* ${enquiryForm.age} Years\n\n` +
-      `_Sent via Online Admission Portal_`;
-
-    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`;
-    setWhatsappEnquiryUrl(waUrl);
-    setEnquirySubmitted(true);
-    window.open(waUrl, '_blank');
-  };
+  const phoneRaw = uiTexts.contactPhone || '9905847357';
+  const cleanPhone = phoneRaw.replace(/\D/g, '');
+  const teacherTitle = uiTexts.heroTitle || 'AIHSAN ANSARI';
+  const whatsappUrl = `https://wa.me/91${cleanPhone}?text=Hello%20${encodeURIComponent(teacherTitle)},%20I%20want%20information%20about%20offline%20tuition%20classes.`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50/70 via-slate-50 to-white text-slate-800 selection:bg-blue-600 selection:text-white">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-12 pb-20 border-b border-blue-100/80">
-        {/* Soft atmospheric blue glows in background */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-300/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-20 left-10 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white relative">
+      {/* Scroll Progress Bar at the top */}
+      <motion.div
+        style={{ scaleX: scrollYProgress }}
+        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600 z-50 origin-left pointer-events-none"
+      />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left Content */}
+      {/* 1. HERO SECTION: Clean 1 Heading + 1 Subheading + 2 Clear Actions */}
+      <section className="relative overflow-hidden pt-12 pb-16 lg:py-20 border-b border-slate-200/80 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            
+            {/* Left Column: Heading + Subtitle + Action Buttons */}
             <div className="lg:col-span-7 space-y-6">
-              <div>
-                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 leading-tight">
-                  {uiTexts.heroTitle || 'AIHSAN ANSARI'}
-                </h1>
-                <p className="mt-3 text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl font-normal">
-                  {uiTexts.heroTagline || 'A simple tool for teachers to manage assignments and for students to stay on top of their work.'}
-                </p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.3 }}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Offline Coaching & Daily Homework Platform</span>
+              </motion.div>
 
-              {/* Animated cycling subjects */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <div className="inline-flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/95 border border-blue-200/80 shadow-xs backdrop-blur-md">
-                  <span className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Subjects:
-                  </span>
-                  <span className="min-w-[150px] sm:min-w-[190px] h-7 sm:h-8 flex items-center">
-                    <span
-                      className={`text-lg sm:text-2xl font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent transform transition-all duration-300 ease-out inline-block ${
-                        isAnimating
-                          ? 'opacity-0 -translate-y-2 scale-95'
-                          : 'opacity-100 translate-y-0 scale-100'
-                      }`}
-                    >
-                      {subjectsList[subjectIndex % subjectsList.length]}
-                    </span>
-                  </span>
-                </div>
-              </div>
+              {/* 1 Main Clean Heading */}
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.35 }}
+                className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-tight"
+              >
+                {teacherTitle}
+              </motion.h1>
 
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  onClick={() => onNavigate('contact')}
-                  className="px-5 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <span>{uiTexts.heroCtaStudentLogin || 'Enroll for Offline Coaching'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+              {/* 1 Crisp Sub-heading (Description) */}
+              <motion.p
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.35, delay: 0.05 }}
+                className="text-base sm:text-lg text-slate-600 leading-relaxed font-normal"
+              >
+                {uiTexts.heroTagline || 'Quality offline tuition for Classes 6 to 12 with daily homework checking and verified student progress.'}
+              </motion.p>
 
-                <button
-                  onClick={() => onNavigate('login', { intent: 'homework' })}
-                  className="px-5 py-3 text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/90 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <BookOpen className="w-4 h-4 text-indigo-600" />
-                  <span>Homework (Class Diary)</span>
-                  <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.5 rounded font-black">Daily HW</span>
-                </button>
-
-                <button
+              {/* Action Buttons: Blue button + Secondary WhatsApp button */}
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.35, delay: 0.1 }}
+                className="flex flex-wrap items-center gap-3 pt-2"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => onNavigate('classes-info')}
-                  className="px-5 py-3 text-sm font-semibold text-slate-700 bg-white/90 border border-slate-200/90 rounded-xl hover:bg-white hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all cursor-pointer"
+                  className="px-6 py-3.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer"
                 >
-                  {uiTexts.heroCtaExploreClasses || 'Explore Classes & Fees'}
-                </button>
-              </div>
+                  <GraduationCap className="w-4 h-4 text-white" />
+                  <span>{uiTexts.heroCtaExploreClasses || 'Explore Classes & Fees'}</span>
+                  <ArrowRight className="w-4 h-4 text-white" />
+                </motion.button>
 
-              {/* Trust markers */}
-              <div className="pt-6 grid grid-cols-3 gap-4 border-t border-blue-100/90 text-xs">
-                <div className="p-3 rounded-xl bg-white/80 border border-blue-100/80 shadow-xs hover:border-blue-200 transition-all">
-                  <div className="font-mono text-xl font-extrabold text-blue-700 tabular-nums">
-                    {uiTexts.stat1Value || '10+'}
-                  </div>
-                  <div className="text-slate-500 text-[11px] mt-0.5 font-medium">{uiTexts.stat1Label || 'Years Board Coaching'}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-white/80 border border-blue-100/80 shadow-xs hover:border-blue-200 transition-all">
-                  <div className="font-mono text-xl font-extrabold text-blue-700 tabular-nums">
-                    {uiTexts.stat2Value || '98.4%'}
-                  </div>
-                  <div className="text-slate-500 text-[11px] mt-0.5 font-medium">{uiTexts.stat2Label || 'Board Pass Excellence'}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-white/80 border border-blue-100/80 shadow-xs hover:border-blue-200 transition-all">
-                  <div className="font-mono text-xl font-extrabold text-blue-700 tabular-nums">
-                    {uiTexts.stat3Value || '25 Max'}
-                  </div>
-                  <div className="text-slate-500 text-[11px] mt-0.5 font-medium">{uiTexts.stat3Label || 'Students Per Batch'}</div>
-                </div>
-              </div>
+                <motion.a
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-3.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 hover:text-emerald-700 hover:border-emerald-300 shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-600" />
+                  <span>Chat on WhatsApp</span>
+                </motion.a>
+              </motion.div>
             </div>
 
-            {/* Right Card: Quick Admission Enquiry in Frosted Glass */}
-            <div className="lg:col-span-5">
-              <div className="p-6 sm:p-8 rounded-3xl bg-white/85 backdrop-blur-xl border border-blue-100 shadow-[0_15px_40px_-5px_rgba(37,99,235,0.08)] relative">
-                <div className="flex items-center justify-between pb-4 border-b border-blue-100/80">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">{uiTexts.enquiryCardTitle || 'Admission Enquiry'}</h3>
-                    <p className="text-xs text-slate-500">{uiTexts.enquiryCardSubtitle || 'Direct admission enquiry via WhatsApp'}</p>
+            {/* Right Column: Clean Snapshot Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 20 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ once: false }}
+              transition={{ duration: 0.35, delay: 0.08 }}
+              className="lg:col-span-5"
+            >
+              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-900">Coaching Overview</h3>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Admissions Open
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-slate-500 font-medium">Target Classes</div>
+                      <div className="font-bold text-slate-900">Class 6, 7, 8, 9, 10, 11, 12</div>
+                    </div>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 shadow-xs">
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-                    </svg>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-slate-500 font-medium">Subjects Offered</div>
+                      <div className="font-bold text-slate-900">{uiTexts.heroSubjects || 'Mathematics, Science, English, Hindi'}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-slate-500 font-medium">Batch System</div>
+                      <div className="font-bold text-slate-900">Small batches (Max 25 students)</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-slate-500 font-medium">Direct Contact</div>
+                      <div className="font-bold text-slate-900">+91 {phoneRaw}</div>
+                    </div>
                   </div>
                 </div>
 
-                {enquirySubmitted ? (
-                  <div className="py-6 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
-                      <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900">Enquiry Sent to WhatsApp!</h4>
-                    <p className="text-xs text-slate-600">
-                      Aapki enquiry <strong>{uiTexts.heroTitle || 'AIHSAN ANSARI'} (+91 {uiTexts.contactPhone || '99058 47357'})</strong> ke WhatsApp par bhej di gayi hai.
-                    </p>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs space-y-1">
-                      <div><span className="text-slate-500 font-medium">Student:</span> <strong className="text-slate-900">{enquiryForm.studentName}</strong></div>
-                      <div><span className="text-slate-500 font-medium">Father:</span> <strong className="text-slate-900">{enquiryForm.fatherName}</strong></div>
-                      <div><span className="text-slate-500 font-medium">Phone:</span> <strong className="text-slate-900">{enquiryForm.phone}</strong></div>
-                      <div><span className="text-slate-500 font-medium">Class:</span> <strong className="text-slate-900">{enquiryForm.className}</strong> (Age: {enquiryForm.age} yrs)</div>
-                    </div>
-                    <div className="pt-2 flex flex-col gap-2">
-                      <a
-                        href={whatsappEnquiryUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2 px-4 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5"
-                      >
-                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-                        </svg>
-                        <span>Open in WhatsApp</span>
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEnquirySubmitted(false);
-                          setEnquiryForm({
-                            studentName: '',
-                            fatherName: '',
-                            phone: '',
-                            className: 'Class 10',
-                            age: ''
-                          });
-                        }}
-                        className="text-xs text-blue-600 underline font-semibold cursor-pointer"
-                      >
-                        Submit another enquiry
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleEnquirySubmit} className="mt-4 space-y-3.5">
-                    {/* Student Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Student Full Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={enquiryForm.studentName}
-                        onChange={e => setEnquiryForm({ ...enquiryForm, studentName: e.target.value })}
-                        placeholder="e.g. Aarav Patel"
-                        className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                      />
-                    </div>
-
-                    {/* Father Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Father's Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={enquiryForm.fatherName}
-                        onChange={e => setEnquiryForm({ ...enquiryForm, fatherName: e.target.value })}
-                        placeholder="e.g. Ramesh Patel"
-                        className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                      />
-                    </div>
-
-                    {/* Phone Number */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={enquiryForm.phone}
-                        onChange={e => setEnquiryForm({ ...enquiryForm, phone: e.target.value })}
-                        placeholder="e.g. 99058 47357"
-                        className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                      />
-                    </div>
-
-                    {/* Class & Age */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Class
-                        </label>
-                        <select
-                          value={enquiryForm.className}
-                          onChange={e => setEnquiryForm({ ...enquiryForm, className: e.target.value })}
-                          className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                        >
-                          <option value="Class 6">Class 6</option>
-                          <option value="Class 7">Class 7</option>
-                          <option value="Class 8">Class 8</option>
-                          <option value="Class 9">Class 9</option>
-                          <option value="Class 10">Class 10</option>
-                          <option value="Class 11">Class 11</option>
-                          <option value="Class 12">Class 12</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Age (Years)
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min="5"
-                          max="25"
-                          value={enquiryForm.age}
-                          onChange={e => setEnquiryForm({ ...enquiryForm, age: e.target.value })}
-                          placeholder="e.g. 15"
-                          className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 px-4 text-xs font-bold text-white bg-[#25D366] hover:bg-[#20bd5a] rounded-xl transition-all shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
-                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-                      </svg>
-                      <span>{uiTexts.enquiryButtonText || 'Send Enquiry on WhatsApp'}</span>
-                    </button>
-
-                    <p className="text-[11px] text-slate-500 text-center flex items-center justify-center gap-1.5 flex-wrap">
-                      <span>WhatsApp Number:</span>
-                      <a
-                        href={`https://wa.me/91${(uiTexts.contactPhone || '9905847357').replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-bold text-emerald-600 hover:underline"
-                      >
-                        +91 {uiTexts.contactPhone || '99058 47357'}
-                      </a>
-                    </p>
-                  </form>
-                )}
+                <div className="pt-2 border-t border-slate-200">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Send Message on WhatsApp</span>
+                  </a>
+                </div>
               </div>
-            </div>
+            </motion.div>
+
           </div>
         </div>
       </section>
 
-      {/* Why This Platform is Different: Offline + Digital Tracking */}
-      <section className="py-16 bg-white/60 backdrop-blur-md border-b border-blue-100/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              {uiTexts.journeyTitle || 'Your Learning Journey Starts Here.'}
+      {/* 2. HOW IT WORKS: 1 Clean Heading + 1 Subheading + 3 Simple Cards */}
+      <section className="py-16 border-b border-slate-200/80 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35 }}
+            className="text-center max-w-xl mx-auto mb-10"
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              How It Works
             </h2>
-            <p className="text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto">
-              {uiTexts.journeySubtitle || 'Everything you need to learn, practice, and stay ahead — all in one place.'}
+            <p className="text-sm text-slate-600 mt-2">
+              A disciplined daily routine designed for conceptual clarity and high board scores.
             </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-              {(uiTexts.journeyPoints && uiTexts.journeyPoints.length > 0 ? uiTexts.journeyPoints : [
-                'Homework & Assignments',
-                'Study Materials & Notes',
-                'Progress Tracking',
-                'Secure Student Access'
-              ]).map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/90 border border-blue-100 shadow-2xs text-xs font-semibold text-slate-800"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-white/90 backdrop-blur-md border border-blue-100 shadow-xs shadow-blue-500/5 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-extrabold text-sm shadow-xs">
-                01
-              </div>
-              <h3 className="text-base font-bold text-slate-900">{uiTexts.feature1Title || '"Aaj Class Mein Kya Padhaya Gaya"'}</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {uiTexts.feature1Desc || 'After every offline lecture, the teacher publishes the exact concept summary and key formulas taught that day. Absent or revising students are never left behind.'}
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white/90 backdrop-blur-md border border-blue-100 shadow-xs shadow-blue-500/5 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-extrabold text-sm shadow-xs">
-                02
-              </div>
-              <h3 className="text-base font-bold text-slate-900">{uiTexts.feature2Title || 'Daily Photo/PDF Solution Uploads'}</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {uiTexts.feature2Desc || 'Students solve problems in fair notebooks and submit clear pictures before the next morning\'s deadline. Teacher reviews and assigns verified marks with corrections.'}
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white/90 backdrop-blur-md border border-blue-100 shadow-xs shadow-blue-500/5 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-extrabold text-sm shadow-xs">
-                03
-              </div>
-              <h3 className="text-base font-bold text-slate-900">{uiTexts.feature3Title || 'Transparent Fee Receipts & Validity'}</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {uiTexts.feature3Desc || 'No disputes over unrecorded cash or pending dates. Pay online or in person; receive official computer-verified receipts with exact membership validity and next due dates.'}
-              </p>
-            </div>
+            {[
+              {
+                step: '01',
+                title: 'Classroom Lecture',
+                desc: 'Every topic and formula is explained step-by-step on the board with regular doubt clearing.'
+              },
+              {
+                step: '02',
+                title: 'Daily Homework',
+                desc: 'Students practice questions daily in fair notebooks and get verified checking with marks.'
+              },
+              {
+                step: '03',
+                title: 'Progress Tracking',
+                desc: 'Regular tests, attendance monitoring, and clear automated fee records with zero confusion.'
+              }
+            ].map((item, idx) => (
+              <motion.div
+                key={item.step}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
+                transition={{ duration: 0.3, delay: idx * 0.08 }}
+                whileHover={{ y: -4 }}
+                className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3"
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 font-extrabold text-xs flex items-center justify-center border border-blue-200">
+                  {item.step}
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {item.title}
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {item.desc}
+                </p>
+              </motion.div>
+            ))}
           </div>
+
         </div>
       </section>
 
-      {/* Classes & Fee Structure Overview */}
-      <section className="py-16 border-b border-blue-100/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+      {/* 3. CLASSES & FEES: 1 Clean Heading + 1 Subheading + 3 Simple Cards */}
+      <section className="py-16 border-b border-slate-200/80 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35 }}
+            className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4"
+          >
             <div>
-              <span className="text-xs font-extrabold tracking-wider text-blue-600 uppercase">
-                Academic Programs
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
-                Batches & Transparent Fee Structure
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                Classes & Fee Structure
               </h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Transparent monthly fees with daily homework checking and tests.
+              </p>
             </div>
             <button
               onClick={() => onNavigate('classes-info')}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
             >
-              <span>View full syllabus & timings</span>
+              <span>View full syllabus</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Class 10 */}
-            <div className="p-6 rounded-3xl bg-gradient-to-b from-blue-50/90 to-white/90 backdrop-blur-xl border border-blue-200/90 shadow-[0_10px_30px_rgba(37,99,235,0.06)] relative flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-mono font-bold text-blue-600 uppercase">Class 10</div>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">Board Excellence Batch</h3>
-                <p className="text-xs text-slate-600 mt-2">
-                  Daily numerical problem-solving, NCERT Exemplar mastery, and 10+ full-length board mock papers.
+            {/* Card 1: Class 8-10 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ y: -4 }}
+              className="p-6 rounded-2xl bg-blue-50/60 border border-blue-200 shadow-xs flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <span className="text-[11px] font-mono font-bold text-blue-700 uppercase bg-blue-100 px-2 py-0.5 rounded">
+                  Class 10 Board Batch
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">Foundation & Boards</h3>
+                <p className="text-xs text-slate-600">
+                  Mathematics and Science with NCERT drills and full-length mock tests.
                 </p>
-
-                <div className="mt-4 pt-4 border-t border-blue-100 space-y-2 text-xs text-slate-700">
+                <div className="space-y-1.5 pt-2 text-xs text-slate-700">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Mathematics & Science (Physics & Chem)</span>
+                    <span>Daily Homework with Teacher Remarks</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Morning & Evening Batches (Max 25)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Daily Homework with Teacher Corrections</span>
+                    <span>Weekly chapter tests</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-blue-100 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-blue-200/80 flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium">Monthly Tuition Fee:</span>
-                  <div className="font-mono text-xl font-extrabold text-blue-700 tabular-nums">
+                  <span className="text-[10px] text-slate-500 font-medium">Monthly Fee:</span>
+                  <div className="font-mono text-xl font-extrabold text-blue-700">
                     ₹2,500<span className="text-xs text-slate-500 font-normal"> / mo</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => onNavigate('register')}
-                  className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-sm shadow-blue-500/20"
+                  onClick={() => onNavigate('classes-info')}
+                  className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors cursor-pointer"
                 >
                   Enroll Now
                 </button>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Class 9 */}
-            <div className="p-6 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-mono font-bold text-slate-500 uppercase">Class 9</div>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">Foundation Batch</h3>
-                <p className="text-xs text-slate-600 mt-2">
-                  Building deep mathematical intuition and physical reasoning for future Olympiads and board readiness.
+            {/* Card 2: Class 9 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false }}
+              transition={{ duration: 0.3, delay: 0.06 }}
+              whileHover={{ y: -4 }}
+              className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <span className="text-[11px] font-mono font-bold text-slate-600 uppercase bg-slate-100 px-2 py-0.5 rounded">
+                  Class 8 & 9
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">Junior Foundation</h3>
+                <p className="text-xs text-slate-600">
+                  Strong fundamentals in Mathematics, Science, and English grammar.
                 </p>
-
-                <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-700">
+                <div className="space-y-1.5 pt-2 text-xs text-slate-700">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Mathematics & General Science</span>
+                    <span>4 days weekly classes</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>4 Days Weekly + Saturday Doubt Session</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Weekly chapter tests & digital notes</span>
+                    <span>Individual doubt solving</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium">Monthly Tuition Fee:</span>
-                  <div className="font-mono text-xl font-extrabold text-slate-900 tabular-nums">
+                  <span className="text-[10px] text-slate-500 font-medium">Monthly Fee:</span>
+                  <div className="font-mono text-xl font-extrabold text-slate-900">
                     ₹2,200<span className="text-xs text-slate-500 font-normal"> / mo</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => onNavigate('register')}
-                  className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors"
+                  onClick={() => onNavigate('classes-info')}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
                   Enroll Now
                 </button>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Class 12 */}
-            <div className="p-6 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_10px_30px_rgba(0,0,0,0.03)] flex flex-col justify-between">
-              <div>
-                <div className="text-xs font-mono font-bold text-slate-500 uppercase">Class 12</div>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">PCM Boards & Entrance</h3>
-                <p className="text-xs text-slate-600 mt-2">
-                  Rigorous calculus, electrodynamics, optics, and wave mechanics with targeted speed-drills.
+            {/* Card 3: Class 11-12 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false }}
+              transition={{ duration: 0.3, delay: 0.12 }}
+              whileHover={{ y: -4 }}
+              className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <span className="text-[11px] font-mono font-bold text-slate-600 uppercase bg-slate-100 px-2 py-0.5 rounded">
+                  Class 11 & 12
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">Senior PCM Batch</h3>
+                <p className="text-xs text-slate-600">
+                  Physics, Chemistry, and Advanced Mathematics for boards & entrances.
                 </p>
-
-                <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs text-slate-700">
+                <div className="space-y-1.5 pt-2 text-xs text-slate-700">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Senior Physics & Advanced Mathematics</span>
+                    <span>Targeted numerical problem sets</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Early Morning 6:00 AM Alpha Batch</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Previous 10 Years Question Bank Drills</span>
+                    <span>Previous 10-year question banks</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium">Monthly Tuition Fee:</span>
-                  <div className="font-mono text-xl font-extrabold text-slate-900 tabular-nums">
+                  <span className="text-[10px] text-slate-500 font-medium">Monthly Fee:</span>
+                  <div className="font-mono text-xl font-extrabold text-slate-900">
                     ₹3,500<span className="text-xs text-slate-500 font-normal"> / mo</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => onNavigate('register')}
-                  className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors"
+                  onClick={() => onNavigate('classes-info')}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
                   Enroll Now
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
+
         </div>
       </section>
 
-      {/* About Teacher Section */}
-      <section className="py-16 bg-white/70 backdrop-blur-md border-b border-blue-100/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
-            <div className="md:col-span-4 flex justify-center">
-              <div className="w-56 h-56 sm:w-64 sm:h-64 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 p-1.5 shadow-xl shadow-blue-500/20">
-                <div className="w-full h-full rounded-[22px] bg-white flex flex-col items-center justify-center p-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-blue-50 border-2 border-blue-300 flex items-center justify-center text-blue-700 mb-3 font-extrabold text-2xl shadow-xs">
-                    {(uiTexts.teacherName || 'RS').substring(0, 2).toUpperCase()}
-                  </div>
-                  <h4 className="font-extrabold text-slate-900 text-base">{uiTexts.teacherName || 'Er. Rajesh V. Sharma'}</h4>
-                  <p className="text-xs text-blue-600 font-semibold">{uiTexts.teacherTitle || 'Senior Mathematics & Physics Faculty'}</p>
-                  <p className="text-[11px] text-slate-500 mt-1">{uiTexts.teacherExperience || '14+ Years Offline Coaching'}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="md:col-span-8 space-y-4">
-              <span className="text-xs font-extrabold tracking-wider text-blue-600 uppercase">
-                Faculty Profile
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                "Direct Student Mentorship Cannot Be Replaced by Video Playlists."
-              </h2>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                {uiTexts.teacherBio || 'With over a decade of teaching offline batches in Pune, Er. Rajesh Sharma has guided hundreds of students to scoring 95+ in CBSE/State board examinations and securing admissions in top engineering and scientific colleges.'}
-              </p>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                "In my cabin and classroom, no student is a passive spectator. Every single theorem is derived step-by-step on the board, and every student's homework is checked daily to catch misconceptions before exam time."
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2 text-xs">
-                <div className="p-3.5 rounded-xl bg-white border border-blue-100 shadow-xs">
-                  <div className="text-slate-500 font-medium">Classroom Location</div>
-                  <div className="font-bold text-slate-900 mt-0.5 truncate">{uiTexts.contactAddress || 'MG Road, Pune'}</div>
-                </div>
-                <div className="p-3.5 rounded-xl bg-white border border-blue-100 shadow-xs">
-                  <div className="text-slate-500 font-medium">Batch Size</div>
-                  <div className="font-bold text-slate-900 mt-0.5">{uiTexts.stat3Value || '25 Max'} Students</div>
-                </div>
-                <div className="p-3.5 rounded-xl bg-white border border-blue-100 shadow-xs">
-                  <div className="text-slate-500 font-medium">Doubt Support</div>
-                  <div className="font-bold text-slate-900 mt-0.5">1-on-1 Daily Cabin Hour</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-16 bg-slate-50/80 border-b border-blue-100/80 scroll-mt-12">
+      {/* 4. FACULTY / ABOUT: 1 Clean Heading + 1 Subheading + Simple Info */}
+      <section className="py-16 border-b border-slate-200/80 bg-slate-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-extrabold tracking-wider text-blue-600 uppercase flex items-center justify-center gap-1.5">
-              <HelpCircle className="w-4 h-4 text-blue-600" />
-              <span>Questions & Answers</span>
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2">
-              Frequently Asked Questions (FAQ)
+          
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35 }}
+            className="text-center max-w-xl mx-auto mb-10"
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              Meet the Faculty
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
-              Everything you need to know about our classes, assignments, and digital tracking.
+            <p className="text-sm text-slate-600 mt-1">
+              Direct mentorship and offline classroom teaching.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="space-y-3">
-            {(uiTexts.faqs && uiTexts.faqs.length > 0 ? uiTexts.faqs : FAQ_ITEMS).map((item, index) => {
-              const isOpen = openFaqIndex === index;
-              return (
-                <div
-                  key={index}
-                  className="rounded-2xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-200 hover:border-blue-200"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                    className="w-full px-5 py-4 text-left flex items-center justify-between gap-4 font-semibold text-sm sm:text-base text-slate-900 hover:text-blue-600 transition-colors cursor-pointer"
-                  >
-                    <span>{item.q}</span>
-                    <span className="p-1 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                      {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <div className="px-5 pb-4 text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
-                      {item.a}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 p-4 rounded-2xl bg-blue-50/80 border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-            <div>
-              <p className="text-xs font-bold text-slate-900">Have a question not listed here?</p>
-              <p className="text-[11px] text-slate-500">Contact {uiTexts.heroTitle || 'AIHSAN ANSARI'} directly on WhatsApp or Call.</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35 }}
+            className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-6"
+          >
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-3xl shadow-md shrink-0">
+              {teacherTitle.substring(0, 2).toUpperCase()}
             </div>
+
+            <div className="space-y-2 text-center sm:text-left">
+              <h3 className="text-xl font-bold text-slate-900">{teacherTitle}</h3>
+              <p className="text-xs font-semibold text-blue-700">
+                {uiTexts.teacherTitle || 'Senior Mathematics & Science Faculty'}
+              </p>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-xl">
+                {uiTexts.teacherBio || 'Dedicated to building strong foundational concepts in Science and Mathematics for board exam toppers and competitive aspirants.'}
+              </p>
+              <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs font-medium text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-blue-600" />
+                  <span>+91 {phoneRaw}</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Offline Classroom Batch</span>
+                </span>
+              </div>
+            </div>
+          </motion.div>
+
+        </div>
+      </section>
+
+      {/* 5. DIRECT CONTACT & WHATSAPP: 1 Clean Heading + 1 Subheading */}
+      <section className="py-16 bg-white border-b border-slate-200/80">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35 }}
+            className="space-y-2"
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              Have Questions? Contact Directly
+            </h2>
+            <p className="text-sm text-slate-600">
+              Call or message on WhatsApp for trial classes, batch schedules, and fee details.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.35, delay: 0.05 }}
+            className="flex flex-wrap items-center justify-center gap-4 pt-2"
+          >
             <a
-              href={`https://wa.me/91${(uiTexts.contactPhone || '9905847357').replace(/\D/g, '')}?text=Hello%20${encodeURIComponent(uiTexts.heroTitle || 'AIHSAN ANSARI')},%20I%20have%20a%20question%20regarding%20coaching.`}
+              href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="px-6 py-3.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-              </svg>
-              <span>WhatsApp: +91 {uiTexts.contactPhone || '99058 47357'}</span>
+              <MessageCircle className="w-4 h-4" />
+              <span>Chat on WhatsApp (+91 {phoneRaw})</span>
             </a>
-          </div>
+
+            <a
+              href={`tel:${cleanPhone}`}
+              className="px-6 py-3.5 text-sm font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Phone className="w-4 h-4 text-slate-600" />
+              <span>Call Directly</span>
+            </a>
+          </motion.div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 bg-white border-t border-slate-200 text-slate-600 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-100">
-            {/* Brand Col */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-base">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-                <span>{uiTexts.brandName || uiTexts.heroTitle || 'AIHSAN ANSARI'}</span>
-              </div>
-              <p className="text-slate-500 text-xs leading-relaxed max-w-sm">
-                {uiTexts.footerNotice || uiTexts.heroTagline || 'A simple tool for teachers to manage assignments and for students to stay on top of their work.'}
-              </p>
-            </div>
-
-            {/* Direct Contact Col */}
-            <div className="space-y-2.5">
-              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Direct Contact</h4>
-              <div className="space-y-2">
-                <a
-                  href={`tel:${(uiTexts.contactPhone || '9905847357').replace(/\D/g, '')}`}
-                  className="flex items-center gap-2 text-slate-700 hover:text-blue-600 transition-colors font-medium"
-                >
-                  <Phone className="w-4 h-4 text-blue-600" />
-                  <span>Call: +91 {uiTexts.contactPhone || '99058 47357'}</span>
-                </a>
-                <a
-                  href={`https://wa.me/91${(uiTexts.contactPhone || '9905847357').replace(/\D/g, '')}?text=Hello%20${encodeURIComponent(uiTexts.heroTitle || 'AIHSAN ANSARI')},%20I%20have%20an%20enquiry%20regarding%20classes%20and%20assignments.`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors font-bold text-xs"
-                >
-                  <svg className="w-4 h-4 fill-emerald-600" viewBox="0 0 24 24">
-                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-                  </svg>
-                  <span>WhatsApp: {uiTexts.contactPhone || '9905847357'}</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Quick Links & Legal */}
-            <div className="space-y-2.5">
-              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Help & Policy</h4>
-              <div className="flex flex-col gap-2">
-                <a href="#faq" className="hover:text-blue-600 transition-colors">
-                  Frequently Asked Questions (FAQ)
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setIsPrivacyModalOpen(true)}
-                  className="text-left hover:text-blue-600 transition-colors cursor-pointer"
-                >
-                  Privacy Policy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('login')}
-                  className="text-left hover:text-blue-600 transition-colors cursor-pointer"
-                >
-                  Portal Login
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 text-[11px]">
-            <p>{uiTexts.footerCopyright || `© 2026 ${uiTexts.brandName || 'Prerna Tuition Academy'}. All rights reserved.`}</p>
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setIsPrivacyModalOpen(true)}
-                className="hover:underline cursor-pointer"
-              >
-                Privacy Policy
-              </button>
-              <span>·</span>
-              <a href="#faq" className="hover:underline">
-                FAQ
-              </a>
-              <span>·</span>
-              <a href="tel:9905847357" className="hover:underline font-semibold text-slate-700">
-                +91 99058 47357
-              </a>
-            </div>
+      {/* 6. CLEAN FOOTER */}
+      <footer className="py-8 bg-slate-50 text-slate-500 text-xs">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 {teacherTitle}. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onNavigate('classes-info')}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              Classes & Fees
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => onNavigate('login')}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              Portal Login
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              Privacy Policy
+            </button>
           </div>
         </div>
       </footer>
 
-      {/* Floating WhatsApp Message Icon on Bottom-Right */}
-      <a
-        href="https://wa.me/919905847357?text=Hello%20AIHSAN%20ANSARI,%20I%20have%20an%20enquiry%20regarding%20classes%20and%20assignments."
+      {/* Floating WhatsApp Quick Button */}
+      <motion.a
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.95 }}
+        href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp with AIHSAN ANSARI"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-full shadow-xl shadow-emerald-500/30 transition-all transform hover:scale-105 active:scale-95 group font-bold text-xs sm:text-sm"
+        aria-label="Chat on WhatsApp"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-xl shadow-emerald-600/30 font-bold text-xs cursor-pointer"
       >
-        <svg className="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.983.541 1.879.82 2.796.82 3.183 0 5.769-2.587 5.77-5.767 0-3.181-2.587-5.767-5.77-5.767zm7.647 5.766c-.001 4.225-3.438 7.662-7.663 7.662-1.309 0-2.522-.333-3.585-.915l-4.43 1.162 1.183-4.321c-.692-1.124-1.066-2.42-1.067-3.754 0-4.225 3.438-7.662 7.663-7.662 4.226.001 7.663 3.438 7.663 7.662zm-3.526 2.378c-.198-.1-.1.171-1.162-.486-.234-.117-.404-.175-.575.087-.171.263-.666.837-.816 1.01-.15.176-.3.198-.498.1-.198-.1-.837-.308-1.595-.984-.59-.526-.988-1.176-1.104-1.374-.117-.198-.012-.305.086-.403.088-.088.198-.234.297-.35.099-.117.132-.198.198-.332.066-.134.033-.25-.017-.35-.05-.1-.448-1.077-.614-1.476-.162-.388-.326-.335-.448-.341l-.382-.007c-.132 0-.348.05-.53.25-.183.2-.698.682-.698 1.664s.714 1.93 1.014 2.33c.3.4 1.405 2.146 3.404 3.008.476.206.848.329 1.138.421.478.152.913.131 1.258.079.385-.057 1.183-.483 1.349-.95.166-.466.166-.866.116-.95-.05-.084-.182-.134-.38-.233z" />
-        </svg>
+        <MessageCircle className="w-4 h-4" />
         <span>WhatsApp</span>
-      </a>
+      </motion.a>
 
       {/* Privacy Policy Modal */}
       {isPrivacyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[85vh] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-lg">
-                <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <span>Privacy Policy</span>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 relative space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h4 className="font-bold text-slate-900 text-sm">Privacy Policy</h4>
               <button
                 type="button"
                 onClick={() => setIsPrivacyModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
-
-            <div className="mt-4 space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">1. Information Collection & Usage</h4>
-                <p>
-                  We only collect essential student and parent information (such as student name, target class, and contact phone number) strictly for managing tuition classes, sending homework reminders, and verifying assignments.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">2. Homework & Academic Submissions</h4>
-                <p>
-                  Any photos, PDFs, or handwritten notes uploaded for daily homework assignments are accessed solely by assigned coaching teachers for grading, correction remarks, and student progress records.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">3. Strict Data Confidentiality & No Third-Party Ads</h4>
-                <p>
-                  We do not sell, rent, or share student phone numbers or personal records with third-party advertising networks. Your data is kept secure and private.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">4. Secure Access Control</h4>
-                <p>
-                  All login accounts are provisioned directly by the institute administrator. Students, teachers, and owners have role-isolated credentials to protect unauthorized access.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-900 mb-1">5. Contact Regarding Privacy</h4>
-                <p>
-                  For any privacy inquiries or to update your contact information, please contact AIHSAN ANSARI directly via Phone or WhatsApp at{' '}
-                  <a href="tel:9905847357" className="font-bold text-blue-600 hover:underline">
-                    +91 99058 47357
-                  </a>.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+            <p className="text-xs text-slate-600 leading-relaxed">
+              We respect your privacy. Contact details provided for admission inquiries are used solely to communicate batch schedules and homework tracking for offline coaching. No data is shared with third parties.
+            </p>
+            <div className="pt-2 flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsPrivacyModalOpen(false)}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold"
               >
-                Understood & Close
+                Close
               </button>
             </div>
           </div>

@@ -98,10 +98,10 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     });
   }
 
-  // 2. Class Selection: Defaults to student's enrolled class, or allows exploring other classes
-  const targetClassId = (typeof req.query.classId === 'string' && req.query.classId !== 'all')
+  // 2. Class Selection: Allow filtering by selected class or 'all'
+  const targetClassId = typeof req.query.classId === 'string'
     ? req.query.classId
-    : student.classId;
+    : 'all';
 
   const eligibleHomework = allHw.filter(h => {
     if (h.isDraft) return false; // Never show drafts to students
@@ -207,8 +207,12 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     isDraft
   } = req.body;
 
-  if (!classId || !subject || !chapter || !teachingSummary || !instructions) {
-    return res.status(400).json({ error: 'Class, subject, chapter, teaching summary ("Aaj class mein kya padhaya"), and instructions are required.' });
+  const hwInstructions = instructions?.trim() || req.body.homeworkText?.trim() || 'Complete assigned exercises.';
+  const hwSummary = teachingSummary?.trim() || req.body.forWhom?.trim() || `Notes for ${chapter}`;
+  const hwTopic = topic?.trim() || req.body.forWhom?.trim() || '';
+
+  if (!classId || !subject || !chapter) {
+    return res.status(400).json({ error: 'Class, subject, and chapter name are required.' });
   }
 
   const allHw = db.get('homework');
@@ -218,9 +222,9 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     batchIds: Array.isArray(batchIds) && batchIds.length > 0 ? batchIds : ['all'],
     subject: subject.trim(),
     chapter: chapter.trim(),
-    topic: topic?.trim() || '',
-    teachingSummary: teachingSummary.trim(),
-    instructions: instructions.trim(),
+    topic: hwTopic,
+    teachingSummary: hwSummary,
+    instructions: hwInstructions,
     publishDate: publishDate || new Date().toISOString(),
     deadlineDate: deadlineDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
     maxMarks: Number(maxMarks) || 20,
@@ -449,6 +453,56 @@ router.post('/submissions/:subId/grade', requireAuth, (req: AuthenticatedRequest
   ]);
 
   return res.json({ message: 'Submission graded successfully', submission: submissions[index] });
+});
+
+// Teacher/Owner deletes entire homework
+router.delete('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const userRole = req.user?.role;
+  if (userRole !== 'teacher' && userRole !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can delete homework.' });
+  }
+
+  const { id } = req.params;
+  const decodedId = decodeURIComponent(id).trim();
+  const allHw = db.get('homework');
+  const index = allHw.findIndex(h => h.id === decodedId || h.id === id);
+
+  if (index !== -1) {
+    allHw.splice(index, 1);
+    db.set('homework', allHw);
+
+    // Clean up associated submissions
+    const submissions = db.get('submissions');
+    const filteredSubs = submissions.filter(s => s.homeworkId !== decodedId && s.homeworkId !== id);
+    db.set('submissions', filteredSubs);
+  }
+
+  return res.json({ success: true, message: 'Homework deleted successfully.' });
+});
+
+// Teacher/Owner removes image from homework
+router.delete('/:id/image', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can modify homework images.' });
+  }
+
+  const { id } = req.params;
+  const allHw = db.get('homework');
+  const index = allHw.findIndex(h => h.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Homework not found.' });
+  }
+
+  // Remove image attachments
+  allHw[index].attachments = (allHw[index].attachments || []).filter(
+    a => a.fileType !== 'image' && !a.fileUrl?.startsWith('data:image') && !a.name?.match(/\.(jpeg|jpg|png|webp)$/i)
+  );
+  allHw[index].updatedAt = new Date().toISOString();
+
+  db.set('homework', allHw);
+
+  return res.json({ success: true, message: 'Homework image removed successfully.', homework: allHw[index] });
 });
 
 export default router;

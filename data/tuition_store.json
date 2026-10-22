@@ -329,7 +329,7 @@
           "id": "att_formula_01",
           "name": "Formula_Sheet_Discriminant_Rules.png",
           "fileType": "image",
-          "fileUrl": "https://example.com/notes/Formula_Discriminant.png",
+          "fileUrl": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80",
           "size": "420 KB"
         }
       ],
@@ -365,6 +365,13 @@
           "fileType": "pdf",
           "fileUrl": "https://example.com/notes/Ray_Diagrams_Class10.pdf",
           "size": "2.1 MB"
+        },
+        {
+          "id": "att_mirror_img",
+          "name": "Light_RayDiagrams_Board.jpg",
+          "fileType": "image",
+          "fileUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1000&auto=format&fit=crop&q=80",
+          "size": "480 KB"
         }
       ],
       "isDraft": false,
@@ -388,16 +395,44 @@
       "priority": "normal",
       "attachments": [
         {
-          "id": "att_poly_worksheet",
-          "name": "Class9_Polynomials_Practice_Set.pdf",
-          "fileType": "pdf",
-          "fileUrl": "https://example.com/notes/Polynomials_Ex2.4.pdf",
-          "size": "850 KB"
+          "id": "att_poly_img",
+          "name": "Class9_Polynomials_Notes.jpg",
+          "fileType": "image",
+          "fileUrl": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1000&auto=format&fit=crop&q=80",
+          "size": "510 KB"
         }
       ],
       "isDraft": false,
       "createdAt": "2026-10-22T08:30:00.000Z",
       "updatedAt": "2026-10-22T08:30:00.000Z"
+    },
+    {
+      "id": "hw_cls12_matrices_01",
+      "classId": "cls_12_pcm",
+      "batchIds": [
+        "all"
+      ],
+      "subject": "Mathematics",
+      "chapter": "Chapter 3: Matrices and Determinants",
+      "topic": "Inverse of a Matrix using Elementary Row Transformations",
+      "teachingSummary": "Class 12 board preparation for Matrices and Determinants.",
+      "instructions": "Solve NCERT Exercise 3.4 Questions 1 to 15.",
+      "publishDate": "2026-10-22T10:00:00.000Z",
+      "deadlineDate": "2026-10-23T18:00:00.000Z",
+      "maxMarks": 25,
+      "priority": "high",
+      "attachments": [
+        {
+          "id": "att_cls12_notes",
+          "name": "Class12_Matrices_Board_Problems.jpg",
+          "fileType": "image",
+          "fileUrl": "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=1000&auto=format&fit=crop&q=80",
+          "size": "580 KB"
+        }
+      ],
+      "isDraft": false,
+      "createdAt": "2026-10-22T09:00:00.000Z",
+      "updatedAt": "2026-10-22T09:00:00.000Z"
     }
   ],
   "submissions": [
@@ -644,13 +679,13 @@
     }
   ],
   "settings": {
-    "tuitionName": "Prerna Tuition Academy",
-    "tagline": "Excellence in Offline Coaching with Modern Digital Homework Tracking",
+    "tuitionName": "XOLARA CLASS",
+    "tagline": "Offline Coaching & Daily Homework Platform",
     "teacherName": "Er. Rajesh V. Sharma (M.Tech, 14+ Yrs Exp)",
     "teacherTitle": "Senior Mathematics & Physics Faculty",
     "teacherBio": "Dedicated to building strong foundational concepts in Science and Mathematics for board exam toppers and competitive aspirants since 2012.",
-    "phone": "+91 98765 43210",
-    "email": "teacher@prerna.edu",
+    "phone": "9905847357",
+    "email": "aihsannew@gmail.com",
     "address": "Cabin 304, Sharda Complex, Near City Library, MG Road, Pune, Maharashtra 411001",
     "subjectsTaught": [
       "Mathematics",
@@ -675,11 +710,11 @@
       "heroTitle": "AIHSAN ANSARI",
       "heroTagline": "A simple tool for teachers to manage assignments and for students to stay on top of their work.",
       "contactPhone": "9905847357",
-      "stat1Value": "10+",
+      "stat1Value": "500+",
       "stat1Label": "Years Board Coaching",
       "stat2Value": "98.4%",
       "stat2Label": "Board Pass Excellence",
-      "stat3Value": "25 Max",
+      "stat3Value": "999",
       "stat3Label": "Students Per Batch",
       "journeyTitle": "Your Learning Journey Starts Here.",
       "journeySubtitle": "Everything you need to learn, practice, and stay ahead — all in one place.",
@@ -697,7 +732,7 @@
       "hybridFeature3Desc": "No disputes over unrecorded cash or pending dates. Pay online or in person; receive official computer-verified receipts with exact membership validity and next due dates."
     },
     "uiTexts": {
-      "brandName": "Prerna Tuition OS",
+      "brandName": "XOLARA CLASS",
       "brandTagline": "Offline Coaching & Daily Homework Platform",
       "navHome": "Overview",
       "navClasses": "Classes & Fees",
@@ -709,14 +744,14 @@
       "heroTitle": "AIHSAN ANSARI",
       "heroTagline": "A simple tool for teachers to manage assignments and for students to stay on top of their work.",
       "heroSubjects": "Mathematics, Science, English, Hindi",
-      "heroCtaStudentLogin": "Student Homework Login",
+      "heroCtaStudentLogin": "Enroll for Offline Coaching",
       "heroCtaExploreClasses": "Explore Classes & Fees",
       "heroCtaTeacherCabin": "Teacher Cabin",
-      "stat1Value": "10+",
+      "stat1Value": "500+",
       "stat1Label": "Years Board Coaching",
       "stat2Value": "98.4%",
       "stat2Label": "Board Pass Excellence",
-      "stat3Value": "25 Max",
+      "stat3Value": "999",
       "stat3Label": "Students Per Batch",
       "stat4Value": "100%",
       "stat4Label": "Daily Homework Verified",
@@ -747,7 +782,7 @@
       "teacherExperience": "14+ Years Teaching Experience",
       "classLevelsSummary": "Class 8 to Class 12 (CBSE / ICSE / State Board)",
       "contactPhone": "9905847357",
-      "contactEmail": "contact@prerna.edu",
+      "contactEmail": "aihsannew@gmail.com",
       "contactAddress": "Cabin 304, Sharda Complex, Near City Library, MG Road, Pune, Maharashtra 411001",
       "footerCopyright": "© 2026 Prerna Tuition Academy. All rights reserved.",
       "footerNotice": "Designed for disciplined offline coaching with modern student digital tracking.",

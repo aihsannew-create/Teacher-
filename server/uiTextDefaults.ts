@@ -16,7 +16,7 @@ export const defaultAllUiTexts: AllUiTexts = {
   heroTitle: 'AIHSAN ANSARI',
   heroTagline: 'A simple tool for teachers to manage assignments and for students to stay on top of their work.',
   heroSubjects: 'Mathematics, Science, English, Hindi',
-  heroCtaStudentLogin: 'Student Homework Login',
+  heroCtaStudentLogin: 'Enroll for Offline Coaching',
   heroCtaExploreClasses: 'Explore Classes & Fees',
   heroCtaTeacherCabin: 'Teacher Cabin',
 

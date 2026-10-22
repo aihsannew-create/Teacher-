@@ -360,117 +360,51 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                       key={hw.id}
                       className="p-6 sm:p-7 rounded-3xl bg-white/90 backdrop-blur-xl border border-blue-100/90 shadow-[0_10px_30px_rgba(37,99,235,0.04)] space-y-5"
                     >
-                      {/* Top Bar of Card */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-4 border-b border-slate-100">
+                      {/* Top Bar of Card: Chapter Name, Class, Subject */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
                         <div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-extrabold text-blue-600 uppercase tracking-wide">
-                              {hw.subject}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="px-2 py-0.5 rounded-md font-bold bg-blue-100 text-blue-800 text-[10px]">
-                              🎓 {hw.className}
-                            </span>
-                            <span className="text-slate-300">·</span>
-                            <span className="font-mono text-slate-500">Max {hw.maxMarks} Marks</span>
-                          </div>
-                          <h3 className="text-lg font-extrabold text-slate-900 mt-1">
+                          <h3 className="text-lg font-black text-slate-900">
                             {hw.chapter}
                           </h3>
-                          <div className="text-xs text-blue-700 font-semibold mt-0.5">
-                            Topic: {hw.topic || 'General Practice'}
-                          </div>
-
-                          {/* Published Date & Time Info */}
-                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-2 font-medium">
-                            <span className="flex items-center gap-1 text-slate-600">
-                              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                              <span>Class Date: <strong>{new Date(hw.publishDate || hw.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs">
+                            <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-lg">
+                              {hw.className}
                             </span>
-                            <span className="flex items-center gap-1 text-slate-600">
-                              <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>Lecture Time: <strong>{new Date(hw.publishDate || hw.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                            <span className="text-slate-300">·</span>
+                            <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-lg">
+                              {hw.subject}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-start sm:self-auto">
-                          <span
-                            className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg flex items-center gap-1 ${
-                              deadline.isOverdue
-                                ? 'bg-red-50 text-red-700 border border-red-200'
-                                : deadline.isUrgent
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>{deadline.text}</span>
-                          </span>
-
-                          {isSubmitted ? (
-                            <span className="px-2.5 py-1 text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>{submission?.status === 'completed' ? 'Graded' : 'Submitted'}</span>
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-800 rounded-lg">
-                              Pending
-                            </span>
-                          )}
-                        </div>
                       </div>
 
-                      {/* Aaj Class Mein Kya Padhaya Gaya (Prominent Blue Glass Panel) */}
-                      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 border border-blue-200/90 space-y-1.5 shadow-2xs">
-                        <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-900">
-                          <BookOpen className="w-4 h-4 text-blue-600" />
-                          <span>Aaj Class Mein Kya Padhaya Gaya (Teacher's Lecture Summary):</span>
-                        </div>
-                        <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-line font-medium">
-                          {hw.teachingSummary}
-                        </p>
+                      {/* Image directly below Chapter, Class, and Subject */}
+                      <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 relative group">
+                        <img
+                          src={
+                            hw.attachments?.find(a => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))?.fileUrl ||
+                            'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80'
+                          }
+                          alt={hw.chapter}
+                          className="w-full max-h-[460px] object-cover sm:object-contain rounded-2xl cursor-pointer transition-transform group-hover:scale-[1.01]"
+                          onClick={() => setViewingImage({
+                            url: hw.attachments?.find(a => a.fileType === 'image')?.fileUrl || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80',
+                            title: hw.chapter
+                          })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setViewingImage({
+                            url: hw.attachments?.find(a => a.fileType === 'image')?.fileUrl || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80',
+                            title: hw.chapter
+                          })}
+                          className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-md cursor-pointer"
+                        >
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          <span>Zoom Image</span>
+                        </button>
                       </div>
-
-                      {/* Instructions */}
-                      <div>
-                        <div className="text-xs font-bold text-slate-700 mb-1">
-                          Homework Instructions & Questions:
-                        </div>
-                        <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80">
-                          {hw.instructions}
-                        </p>
-                      </div>
-
-                      {/* Attached Blackboard Photos / Worksheets Gallery */}
-                      {hw.attachments && hw.attachments.some(a => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i)) && (
-                        <div className="pt-2 border-t border-slate-100 space-y-2">
-                          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                            <ImageIcon className="w-4 h-4 text-blue-600" />
-                            <span>Blackboard Photos & Handwritten Notes (Click to Zoom):</span>
-                          </div>
-                          <div className="flex flex-wrap gap-3">
-                            {hw.attachments
-                              .filter(att => att.fileType === 'image' || att.fileUrl?.startsWith('data:image') || att.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))
-                              .map((att, idx) => (
-                                <div
-                                  key={att.id || idx}
-                                  onClick={() => setViewingImage({ url: att.fileUrl, title: `${hw.subject} - ${att.name}` })}
-                                  className="group relative cursor-pointer rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 hover:border-blue-400 shadow-2xs hover:shadow-md transition-all w-28 sm:w-36 aspect-4/3"
-                                >
-                                  <img src={att.fileUrl} alt={att.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                  <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1">
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                    <span>Zoom</span>
-                                  </div>
-                                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-1 text-[9px] text-white truncate px-1.5">
-                                    {att.name}
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
 
                       {/* PDF Documents & Reference Links */}
                       {((hw.attachments && hw.attachments.some(a => a.fileType !== 'image' && !a.fileUrl?.startsWith('data:image') && !a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))) || (hw.referenceLinks && hw.referenceLinks.length > 0)) && (

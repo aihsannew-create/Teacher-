@@ -10,6 +10,7 @@ import { LandingPage } from './pages/LandingPage';
 import { ClassesInfoPage } from './pages/ClassesInfoPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { HomeworkGatePage } from './pages/HomeworkGatePage';
 
 // Owner Cabin Page
 import { OwnerAccessControl } from './pages/OwnerAccessControl';
@@ -97,6 +98,7 @@ function AppContent() {
   const getViewTitle = (view: string) => {
     switch (view) {
       case 'classes-info': return 'Classes & Fee Structure';
+      case 'homework-gate': return 'Homework';
       case 'login': return 'Account Login';
       case 'register': return 'Student Registration';
       case 'owner-access': return 'Owner Control & Credentials';
@@ -161,6 +163,7 @@ function AppContent() {
         {currentView === 'classes-info' && <ClassesInfoPage onNavigate={handleNavigate} />}
         {currentView === 'about-teacher' && <LandingPage onNavigate={handleNavigate} />}
         {currentView === 'contact' && <LandingPage onNavigate={handleNavigate} />}
+        {currentView === 'homework-gate' && <HomeworkGatePage onNavigate={handleNavigate} />}
         {currentView === 'login' && <LoginPage onNavigate={handleNavigate} extra={navigationExtra} />}
         {currentView === 'register' && <RegisterPage onNavigate={handleNavigate} />}
 
