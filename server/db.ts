@@ -62,8 +62,8 @@ const defaultSettings: TeacherSettings = {
     description: 'Late submissions attract Rs 20/day discipline fine to encourage consistency.'
   },
   upiDetails: {
-    upiId: 'prerna.academy@icici',
-    accountName: 'Prerna Tuition Academy / R V Sharma'
+    upiId: '9905847357@ybl',
+    accountName: 'AIHSAN ANSARI'
   },
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_PrernaTuition2026',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || 'test_secret_prerna9981',

@@ -21,8 +21,13 @@ import {
   Plus,
   HelpCircle,
   Calendar,
-  User
+  User,
+  CreditCard,
+  QrCode
 } from 'lucide-react';
+import { QuickFeeModal } from '../components/QuickFeeModal';
+import { ReceiptModal } from '../components/ReceiptModal';
+import { PaymentReceipt } from '../types';
 
 interface LandingPageProps {
   onNavigate: (view: string, extra?: any) => void;
@@ -37,6 +42,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const cleanPhone = phoneRaw.replace(/\D/g, '');
   const teacherTitle = uiTexts.heroTitle || 'AIHSAN ANSARI';
   const whatsappUrl = `https://wa.me/91${cleanPhone}?text=Hello%20${encodeURIComponent(teacherTitle)},%20I%20want%20information%20about%20offline%20tuition%20classes.`;
+
+  // Floating Fee Modal State
+  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
+  const [receiptToShow, setReceiptToShow] = useState<PaymentReceipt | null>(null);
 
   // Inquiry Form State
   const [inqName, setInqName] = useState('');
@@ -130,7 +139,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 {uiTexts.heroTagline || 'Quality offline tuition for Classes 6 to 12 with daily homework checking and verified student progress.'}
               </motion.p>
 
-              {/* Action Buttons: Blue button + Secondary WhatsApp button */}
+              {/* Action Buttons: Blue button + Quick Fee Deposit + Secondary WhatsApp button */}
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -147,6 +156,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   <GraduationCap className="w-4 h-4 text-white" />
                   <span>{uiTexts.heroCtaExploreClasses || 'Explore Classes & Fees'}</span>
                   <ArrowRight className="w-4 h-4 text-white" />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  type="button"
+                  onClick={() => setIsFeeModalOpen(true)}
+                  className="px-5 py-3.5 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4 text-blue-600" />
+                  <span>Pay Tuition Fee (फ़ीस जमा करें)</span>
                 </motion.button>
 
                 <motion.a
@@ -691,21 +711,62 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         </div>
       </footer>
 
-      {/* Floating WhatsApp Quick Button */}
-      <motion.a
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-xl shadow-emerald-600/30 font-bold text-xs cursor-pointer"
-      >
-        <MessageCircle className="w-4 h-4" />
-        <span>WhatsApp</span>
-      </motion.a>
+      {/* Floating Action Buttons Dock (Fee Deposit Button + WhatsApp Help Button) */}
+      <div className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col sm:flex-row items-end sm:items-center gap-2.5">
+        {/* Floating Fee Button */}
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={() => setIsFeeModalOpen(true)}
+          aria-label="Pay / Deposit Tuition Fee (फ़ीस जमा करें)"
+          className="flex items-center gap-2.5 px-4 sm:px-5 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full shadow-2xl shadow-blue-600/40 border border-white/25 font-bold text-xs cursor-pointer group transition-all"
+        >
+          <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:rotate-12 transition-transform">
+            <CreditCard className="w-3.5 h-3.5 text-amber-300" />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="leading-tight flex items-center gap-1.5 font-black tracking-wide">
+              <span>Pay Tuition Fee</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </span>
+            <span className="text-[10px] text-blue-200 font-medium">फ़ीस जमा करें · Quick Receipt</span>
+          </div>
+        </motion.button>
+
+        {/* Floating WhatsApp Quick Button */}
+        <motion.a
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          href={whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Chat on WhatsApp"
+          className="flex items-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-xl shadow-emerald-600/30 font-bold text-xs cursor-pointer"
+        >
+          <MessageCircle className="w-4 h-4" />
+          <span>WhatsApp</span>
+        </motion.a>
+      </div>
+
+      {/* Quick Fee Deposit Modal */}
+      <QuickFeeModal
+        isOpen={isFeeModalOpen}
+        onClose={() => setIsFeeModalOpen(false)}
+        onSuccess={(rcp) => {
+          setReceiptToShow(rcp);
+        }}
+      />
+
+      {/* Receipt Viewer Modal */}
+      <ReceiptModal
+        receipt={receiptToShow}
+        onClose={() => setReceiptToShow(null)}
+      />
 
       {/* Privacy Policy Modal */}
       {isPrivacyModalOpen && (

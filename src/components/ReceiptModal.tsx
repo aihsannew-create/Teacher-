@@ -1,6 +1,7 @@
 import React from 'react';
 import { PaymentReceipt } from '../types';
-import { X, Printer, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, Printer, CheckCircle, ShieldCheck, MessageCircle } from 'lucide-react';
+import { useUiText } from '../context/UiTextContext';
 
 interface ReceiptModalProps {
   receipt: PaymentReceipt | null;
@@ -8,11 +9,17 @@ interface ReceiptModalProps {
 }
 
 export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
+  const { uiTexts } = useUiText();
   if (!receipt) return null;
 
   const handlePrint = () => {
     window.print();
   };
+
+  const facultyName = uiTexts.heroTitle || 'AIHSAN ANSARI';
+  const facultyPhone = uiTexts.contactPhone || '9905847357';
+  const shareText = `*Official Tuition Fee Receipt*\nReceipt No: #${receipt.receiptNumber}\nStudent: ${receipt.studentName} (${receipt.rollNumber})\nClass: ${receipt.className}\nMonth: ${receipt.billingMonth}\nAmount Paid: Rs ${receipt.amount}\nMode: ${receipt.paymentMethod.toUpperCase()}\nStatus: Verified\nFaculty: ${facultyName} (${facultyPhone})`;
+  const receiptWhatsAppUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
@@ -28,6 +35,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) 
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href={receiptWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors shadow-xs"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Share Receipt</span>
+            </a>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors shadow-xs"
@@ -37,7 +53,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) 
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-white transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -61,7 +77,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) 
                 Cabin 304, Sharda Complex, Near City Library, MG Road, Pune, Maharashtra 411001
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Teacher: Er. Rajesh V. Sharma (M.Tech) · Phone: +91 98765 43210
+                Faculty: {facultyName} · Phone: +91 {facultyPhone}
               </p>
             </div>
 
@@ -173,7 +189,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) 
             </div>
             <div className="text-center">
               <div className="font-serif italic text-sm text-slate-800 font-semibold mb-1">
-                Rajesh V. Sharma
+                {facultyName}
               </div>
               <div className="w-36 border-t border-blue-200 pt-1 text-[11px] text-slate-500 font-medium">
                 Authorized Faculty Signatory

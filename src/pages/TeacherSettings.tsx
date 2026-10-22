@@ -242,6 +242,24 @@ export const TeacherSettingsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Active QR Preview Banner */}
+            <div className="flex items-center gap-3 p-3 bg-purple-50/80 rounded-xl border border-purple-200 text-xs">
+              <img
+                src="/assets/aistudio/phonepe_qr_code_square.png"
+                alt="Active QR"
+                className="w-12 h-12 rounded-lg border border-purple-300 bg-white object-contain p-0.5 shadow-xs"
+              />
+              <div className="flex-1">
+                <div className="font-bold text-purple-950 flex items-center gap-1.5">
+                  <span>PhonePe UPI QR Linked</span>
+                  <span className="text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.2 rounded">9905847357@ybl</span>
+                </div>
+                <p className="text-[11px] text-purple-800/80">
+                  India Post Payments Bank (8482) QR is active on public fee deposit and floating button modal.
+                </p>
+              </div>
+            </div>
+
             <div className="text-xs">
               <label className="block text-slate-700 font-semibold mb-1">Razorpay Key ID</label>
               <input

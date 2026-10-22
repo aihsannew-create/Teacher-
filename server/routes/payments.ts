@@ -450,4 +450,243 @@ router.get('/receipt/:receiptNumber', requireAuth, (req: AuthenticatedRequest, r
   return res.json({ receipt, settings });
 });
 
+// 6. Public Quick Info for Floating Fee Modal (Students, Classes, UPI details)
+router.get('/quick-info', (_req, res: Response) => {
+  const students = db.get('students');
+  const classes = db.get('classes');
+  const memberships = db.get('memberships');
+  const settings = db.get('settings');
+
+  const studentList = students.map(s => {
+    const cls = classes.find(c => c.id === s.classId);
+    const mem = memberships.find(m => m.studentId === s.id);
+    return {
+      id: s.id,
+      name: s.name,
+      rollNumber: s.rollNumber,
+      phone: s.phone,
+      classId: s.classId,
+      className: cls?.name || 'Class',
+      monthlyFee: s.customFee || cls?.monthlyFee || 2500,
+      status: s.status,
+      expiryDate: mem?.expiryDate
+    };
+  });
+
+  return res.json({
+    students: studentList,
+    classes: classes.map(c => ({
+      id: c.id,
+      name: c.name,
+      code: c.code,
+      monthlyFee: c.monthlyFee,
+      subjects: c.subjects
+    })),
+    upiDetails: settings.upiDetails || {
+      upiId: '9905847357@ybl',
+      accountName: 'AIHSAN ANSARI'
+    },
+    tuitionName: settings.tuitionName,
+    teacherName: settings.teacherName,
+    phone: settings.phone
+  });
+});
+
+// 7. Public Fee Deposit from Floating Fee Button (Quick fee submission)
+router.post('/public-deposit', (req, res: Response) => {
+  const {
+    studentId,
+    studentName,
+    rollNumber,
+    phone,
+    classId,
+    className,
+    amount,
+    billingMonth,
+    paymentMethod,
+    transactionRef,
+    notes
+  } = req.body;
+
+  const feeAmount = Number(amount);
+  if (!studentName || !feeAmount || feeAmount <= 0) {
+    return res.status(400).json({ error: 'Valid student name and fee amount are required.' });
+  }
+
+  const students = db.get('students');
+  const classes = db.get('classes');
+  const memberships = db.get('memberships');
+  const batches = db.get('batches');
+  const settings = db.get('settings');
+  const nowIso = new Date().toISOString();
+
+  // Find or identify student
+  let student = studentId ? students.find(s => s.id === studentId) : undefined;
+  if (!student && rollNumber) {
+    student = students.find(s => s.rollNumber.toLowerCase() === String(rollNumber).trim().toLowerCase());
+  }
+  if (!student && phone) {
+    student = students.find(s => s.phone.replace(/[^0-9]/g, '') === String(phone).replace(/[^0-9]/g, ''));
+  }
+
+  const selectedClass = classes.find(c => c.id === classId || c.name === className) || classes[0];
+  const matchedBatch = batches.find(b => b.classId === selectedClass?.id) || batches[0];
+
+  let effectiveStudentId = student ? student.id : `stu_quick_${Date.now()}`;
+  let effectiveRollNumber = student ? student.rollNumber : (rollNumber || `PRN-FEES-${Date.now().toString().slice(-4)}`);
+  let effectiveStudentName = student ? student.name : String(studentName).trim();
+  let effectiveClassName = student ? (classes.find(c => c.id === student?.classId)?.name || className) : (selectedClass?.name || className || 'Coaching Class');
+
+  // If new walk-in student, create a lightweight student record
+  if (!student) {
+    const newStudent: StudentProfile = {
+      id: effectiveStudentId,
+      userId: `usr_quick_${Date.now()}`,
+      name: effectiveStudentName,
+      rollNumber: effectiveRollNumber,
+      phone: phone || '',
+      email: `${effectiveRollNumber.toLowerCase()}@tuition.local`,
+      classId: selectedClass?.id || 'cls_10',
+      batchId: matchedBatch?.id || 'btc_10_morn',
+      status: 'active',
+      enrollmentDate: nowIso.split('T')[0],
+      guardianName: 'Guardian',
+      guardianPhone: phone || '',
+      guardianRelation: 'Parent',
+      customFee: feeAmount
+    };
+    db.set('students', [newStudent, ...students]);
+  } else {
+    // Ensure existing student is active
+    const sIdx = students.findIndex(s => s.id === student!.id);
+    if (sIdx !== -1) {
+      students[sIdx].status = 'active';
+      db.set('students', students);
+    }
+  }
+
+  // Extend or create membership
+  const memIndex = memberships.findIndex(m => m.studentId === effectiveStudentId);
+  const currentExpiry = memIndex !== -1 ? memberships[memIndex].expiryDate : undefined;
+  const newExpiry = getExtendedExpiryDate(currentExpiry);
+
+  if (memIndex !== -1) {
+    memberships[memIndex] = {
+      ...memberships[memIndex],
+      status: 'active',
+      expiryDate: newExpiry,
+      lastPaymentDate: nowIso.split('T')[0],
+      lastPaymentAmount: feeAmount
+    };
+  } else {
+    memberships.push({
+      id: `mem_${Date.now()}`,
+      studentId: effectiveStudentId,
+      startDate: nowIso.split('T')[0],
+      expiryDate: newExpiry,
+      status: 'active',
+      lastPaymentDate: nowIso.split('T')[0],
+      lastPaymentAmount: feeAmount,
+      autoRenew: false,
+      gracePeriodDays: 3
+    });
+  }
+  db.set('memberships', memberships);
+
+  const receiptNumber = generateReceiptNumber();
+  const paymentId = `pay_quick_${Date.now()}`;
+  const effectiveMonth = billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const effectiveMethod = paymentMethod || 'upi';
+  const effectiveTxnRef = transactionRef || (effectiveMethod === 'cash' ? `CASH-${receiptNumber}` : `UPI-${Date.now().toString().slice(-6)}`);
+
+  // Record payment transaction
+  const newPayment: PaymentTransaction = {
+    id: paymentId,
+    studentId: effectiveStudentId,
+    studentName: effectiveStudentName,
+    rollNumber: effectiveRollNumber,
+    classId: selectedClass?.id || 'cls_10',
+    amount: feeAmount,
+    periodStart: nowIso.split('T')[0],
+    periodEnd: newExpiry,
+    status: 'success',
+    paymentMethod: effectiveMethod,
+    receiptNumber,
+    teacherNotes: notes || `Direct fee deposit via floating portal (${effectiveMethod.toUpperCase()})`,
+    createdAt: nowIso
+  };
+  db.set('payments', [newPayment, ...db.get('payments')]);
+
+  // Record payment receipt
+  const newReceipt: PaymentReceipt = {
+    receiptNumber,
+    paymentId,
+    studentId: effectiveStudentId,
+    studentName: effectiveStudentName,
+    rollNumber: effectiveRollNumber,
+    className: effectiveClassName,
+    batchName: matchedBatch?.name || 'General Batch',
+    billingMonth: effectiveMonth,
+    amount: feeAmount,
+    paymentMethod: effectiveMethod,
+    transactionId: effectiveTxnRef,
+    paidAt: nowIso,
+    receiptDate: nowIso.split('T')[0],
+    teacherNotes: notes || `Quick deposit verified. Validity extended until ${newExpiry}`
+  };
+  db.set('receipts', [newReceipt, ...db.get('receipts')]);
+
+  // Record notification for the student
+  const notifs = db.get('notifications');
+  db.set('notifications', [
+    {
+      id: `notif_${Date.now()}`,
+      recipientId: effectiveStudentId,
+      title: 'Fee Payment Received',
+      message: `Tuition fee of Rs ${feeAmount} deposited for ${effectiveMonth}. Receipt #${receiptNumber} generated. Validity: ${newExpiry}.`,
+      type: 'payment_success',
+      read: false,
+      createdAt: nowIso,
+      actionUrl: `/receipt/${receiptNumber}`
+    },
+    ...notifs
+  ]);
+
+  // Record audit log
+  const auditLogs = db.get('auditLogs');
+  db.set('auditLogs', [
+    {
+      id: `audit_${Date.now()}`,
+      userId: effectiveStudentId,
+      userName: effectiveStudentName,
+      action: 'PUBLIC_FEE_DEPOSIT',
+      details: `Fee deposit of Rs ${feeAmount} (${effectiveMethod}) for ${effectiveStudentName} (${effectiveRollNumber}). Receipt #${receiptNumber}. Validity: ${newExpiry}.`,
+      timestamp: nowIso
+    },
+    ...auditLogs
+  ]);
+
+  return res.status(201).json({
+    success: true,
+    message: `Fee of Rs ${feeAmount} submitted successfully! Official Receipt #${receiptNumber} generated.`,
+    receipt: newReceipt,
+    payment: newPayment,
+    newExpiryDate: newExpiry
+  });
+});
+
+// 8. Public Single Receipt lookup
+router.get('/public-receipt/:receiptNumber', (req, res: Response) => {
+  const { receiptNumber } = req.params;
+  const receipts = db.get('receipts');
+  const receipt = receipts.find(r => r.receiptNumber.toUpperCase() === receiptNumber.toUpperCase());
+
+  if (!receipt) {
+    return res.status(404).json({ error: 'Receipt not found.' });
+  }
+
+  const settings = db.get('settings');
+  return res.json({ receipt, settings });
+});
+
 export default router;
