@@ -1,0 +1,6 @@
+{
+  "name": "Prerna Tuition OS - Offline Coaching & Daily Homework Platform",
+  "description": "Complete offline coaching management system with class-wise daily homework, automated monthly fees, attendance tracking, and teacher cabin.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

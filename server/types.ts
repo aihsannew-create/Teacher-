@@ -1,0 +1,229 @@
+export type UserRole = 'owner' | 'teacher' | 'student' | 'parent';
+
+export type StudentStatus = 'active' | 'pending_payment' | 'expired' | 'suspended' | 'pending_approval';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  role: UserRole;
+  passwordHash: string;
+  createdAt: string;
+  loginAccessGranted?: boolean; // Controlled exclusively by Institute Owner
+  teacherTitle?: string;
+  assignedSubjects?: string[];
+  createdByOwner?: boolean;
+}
+
+export interface StudentProfile {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  rollNumber: string;
+  classId: string;
+  batchId: string;
+  guardianName: string;
+  guardianPhone: string;
+  guardianRelation: string;
+  enrollmentDate: string;
+  status: StudentStatus;
+  avatarUrl?: string;
+  customFee?: number; // optional fee override
+  notes?: string;
+  loginAccessGranted?: boolean; // Controlled exclusively by Institute Owner
+  approvedByOwnerAt?: string;
+}
+
+export interface ClassLevel {
+  id: string;
+  name: string; // e.g. "Class 10", "Class 9", "Class 11 - PCM"
+  code: string;
+  subjects: string[]; // e.g. ["Mathematics", "Physics", "Chemistry"]
+  monthlyFee: number; // default monthly tuition fee
+  description?: string;
+}
+
+export interface Batch {
+  id: string;
+  classId: string;
+  name: string; // e.g. "Morning Alpha (7:00 AM - 8:30 AM)"
+  timing: string;
+  days: string[]; // e.g. ["Mon", "Wed", "Fri"] or ["Daily"]
+  maxCapacity: number;
+}
+
+export interface HomeworkAttachment {
+  id: string;
+  name: string;
+  fileType: 'pdf' | 'image' | 'doc' | 'link';
+  fileUrl: string; // base64 data URL or external secure URL
+  size?: string;
+}
+
+export interface Homework {
+  id: string;
+  classId: string;
+  batchIds: string[]; // e.g. ['all'] or specific batch IDs
+  subject: string;
+  chapter: string;
+  topic: string;
+  teachingSummary: string; // "Aaj class mein kya padhaya gaya"
+  instructions: string;
+  publishDate: string; // ISO string
+  deadlineDate: string; // ISO string
+  maxMarks: number;
+  priority: 'normal' | 'high' | 'urgent';
+  attachments: HomeworkAttachment[];
+  referenceLinks?: { title: string; url: string }[];
+  isDraft: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubmissionStatus = 'submitted' | 'completed' | 'needs_correction' | 'incomplete';
+
+export interface HomeworkSubmission {
+  id: string;
+  homeworkId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  submissionDate: string;
+  solutionText?: string;
+  attachments: HomeworkAttachment[];
+  status: SubmissionStatus;
+  obtainedMarks?: number;
+  teacherFeedback?: string;
+  gradedAt?: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  classId: string;
+  batchId: string;
+  studentId: string;
+  status: 'present' | 'absent' | 'late';
+  remarks?: string;
+  recordedAt: string;
+}
+
+export interface Membership {
+  id: string;
+  studentId: string;
+  startDate: string; // YYYY-MM-DD
+  expiryDate: string; // YYYY-MM-DD
+  status: 'active' | 'grace_period' | 'expired';
+  lastPaymentDate?: string;
+  lastPaymentAmount?: number;
+  autoRenew: boolean;
+  gracePeriodDays: number;
+}
+
+export interface PaymentReceipt {
+  receiptNumber: string; // e.g. "RCP-2026-0089"
+  paymentId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  className: string;
+  batchName: string;
+  billingMonth: string; // e.g. "November 2026"
+  amount: number;
+  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer';
+  transactionId: string;
+  paidAt: string;
+  receiptDate: string;
+  teacherNotes?: string;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  classId: string;
+  amount: number;
+  periodStart: string;
+  periodEnd: string;
+  status: 'success' | 'pending' | 'failed';
+  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer';
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  receiptNumber: string;
+  teacherNotes?: string;
+  createdAt: string;
+  idempotencyKey?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  recipientId: string; // studentId or 'all' or 'class:<id>'
+  title: string;
+  message: string;
+  type: 'homework' | 'fee_due' | 'payment_success' | 'attendance' | 'announcement';
+  read: boolean;
+  createdAt: string;
+  actionUrl?: string;
+}
+
+export interface TeacherSettings {
+  tuitionName: string;
+  tagline: string;
+  teacherName: string;
+  teacherTitle: string;
+  teacherBio: string;
+  phone: string;
+  email: string;
+  address: string;
+  subjectsTaught: string[];
+  classLevelsSummary: string;
+  gracePeriodDays: number; // e.g. 3 or 7 days
+  lateHomeworkPenalty: {
+    enabled: boolean;
+    penaltyPerDay: number;
+    description: string;
+  };
+  upiDetails: {
+    upiId: string;
+    accountName: string;
+    qrUrl?: string;
+  };
+  razorpayKeyId?: string;
+  razorpayKeySecret?: string;
+  landingContent?: LandingContent;
+}
+
+export interface LandingContent {
+  heroTitle: string;
+  heroTagline: string;
+  contactPhone: string;
+  stat1Value: string;
+  stat1Label: string;
+  stat2Value: string;
+  stat2Label: string;
+  stat3Value: string;
+  stat3Label: string;
+  journeyTitle: string;
+  journeySubtitle: string;
+  journeyPoints: string[];
+  hybridFeature1Title: string;
+  hybridFeature1Desc: string;
+  hybridFeature2Title: string;
+  hybridFeature2Desc: string;
+  hybridFeature3Title: string;
+  hybridFeature3Desc: string;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: string;
+}

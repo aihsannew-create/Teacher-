@@ -1,0 +1,440 @@
+import { Router, Response } from 'express';
+import { db } from '../db';
+import { requireAuth, AuthenticatedRequest } from '../auth';
+import { Homework, HomeworkSubmission, AppNotification } from '../types';
+
+const router = Router();
+
+// Helper to check student membership status against current date and grace period
+function isMembershipActive(studentId: string): { active: boolean; isGracePeriod: boolean; expiryDate: string; daysRemaining: number } {
+  const memberships = db.get('memberships');
+  const settings = db.get('settings');
+  const mem = memberships.find(m => m.studentId === studentId);
+
+  if (!mem) {
+    return { active: false, isGracePeriod: false, expiryDate: '', daysRemaining: -999 };
+  }
+
+  const now = new Date();
+  const expiry = new Date(mem.expiryDate);
+  const diffTime = expiry.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const gracePeriodDays = settings.gracePeriodDays || 3;
+
+  if (diffDays >= 0) {
+    return { active: true, isGracePeriod: false, expiryDate: mem.expiryDate, daysRemaining: diffDays };
+  } else if (Math.abs(diffDays) <= gracePeriodDays) {
+    return { active: true, isGracePeriod: true, expiryDate: mem.expiryDate, daysRemaining: diffDays };
+  } else {
+    return { active: false, isGracePeriod: false, expiryDate: mem.expiryDate, daysRemaining: diffDays };
+  }
+}
+
+// GET all homework with role-based filtering and server-side membership protection
+router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const allHw = db.get('homework');
+  const submissions = db.get('submissions');
+  const classes = db.get('classes');
+  const batches = db.get('batches');
+
+  if (user.role === 'teacher') {
+    const { classId, batchId, status } = req.query;
+    let list = [...allHw];
+
+    if (classId && typeof classId === 'string' && classId !== 'all') {
+      list = list.filter(h => h.classId === classId);
+    }
+    if (batchId && typeof batchId === 'string' && batchId !== 'all') {
+      list = list.filter(h => h.batchIds.includes('all') || h.batchIds.includes(batchId));
+    }
+    if (status === 'draft') {
+      list = list.filter(h => h.isDraft);
+    } else if (status === 'published') {
+      list = list.filter(h => !h.isDraft);
+    }
+
+    // Attach submission statistics for teacher
+    const enriched = list.map(hw => {
+      const cls = classes.find(c => c.id === hw.classId);
+      const hwSubs = submissions.filter(s => s.homeworkId === hw.id);
+      const totalEnrolled = db.get('students').filter(s => s.classId === hw.classId && s.status !== 'suspended').length;
+      return {
+        ...hw,
+        className: cls?.name || 'Class',
+        submissionsCount: hwSubs.length,
+        totalEnrolled,
+        completedCount: hwSubs.filter(s => s.status === 'completed').length,
+        needsCorrectionCount: hwSubs.filter(s => s.status === 'needs_correction').length,
+        pendingReviewCount: hwSubs.filter(s => s.status === 'submitted').length
+      };
+    });
+
+    return res.json({ homework: enriched });
+  }
+
+  // Student portal: Strict Class Isolation & Server-Side Membership Check
+  const student = user.studentProfile;
+  if (!student) {
+    return res.status(403).json({ error: 'No student profile linked to this account.' });
+  }
+
+  // 1. Check membership server-side
+  const memberStatus = isMembershipActive(student.id);
+  const studentClass = classes.find(c => c.id === student.classId);
+
+  // If student membership is completely expired past grace period, SERVER BLOCKS full homework details
+  if (!memberStatus.active) {
+    return res.status(403).json({
+      error: 'membership_expired',
+      message: 'Your tuition membership has expired. Please renew your monthly fee to view daily homework, class summaries, and submit solutions.',
+      membership: {
+        status: 'expired',
+        expiryDate: memberStatus.expiryDate,
+        monthlyFee: student.customFee || studentClass?.monthlyFee || 2500,
+        daysOverdue: Math.abs(memberStatus.daysRemaining)
+      }
+    });
+  }
+
+  // 2. Class Isolation: Only show homework assigned to the student's class and batch
+  const eligibleHomework = allHw.filter(h => {
+    if (h.isDraft) return false; // Never show drafts to students
+    if (h.classId !== student.classId) return false; // STRICT CLASS ISOLATION
+    if (h.batchIds.includes('all')) return true;
+    return h.batchIds.includes(student.batchId);
+  });
+
+  // Attach student's submission status
+  const enriched = eligibleHomework.map(hw => {
+    const studentSub = submissions.find(s => s.homeworkId === hw.id && s.studentId === student.id);
+    return {
+      ...hw,
+      className: studentClass?.name || 'My Class',
+      mySubmission: studentSub || null,
+      isSubmitted: !!studentSub,
+      submissionStatus: studentSub?.status || 'pending'
+    };
+  });
+
+  return res.json({
+    homework: enriched,
+    membershipWarning: memberStatus.isGracePeriod ? {
+      message: `Your membership is currently in a ${Math.abs(memberStatus.daysRemaining)} day grace period. Please clear dues soon.`,
+      daysLeft: Math.abs(memberStatus.daysRemaining)
+    } : null
+  });
+});
+
+// GET single homework by ID
+router.get('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const user = req.user!;
+  const allHw = db.get('homework');
+  const hw = allHw.find(h => h.id === id);
+
+  if (!hw) {
+    return res.status(404).json({ error: 'Homework not found.' });
+  }
+
+  const submissions = db.get('submissions');
+  const classes = db.get('classes');
+  const batches = db.get('batches');
+  const cls = classes.find(c => c.id === hw.classId);
+
+  if (user.role === 'teacher') {
+    const hwSubs = submissions.filter(s => s.homeworkId === hw.id);
+    return res.json({
+      homework: hw,
+      className: cls?.name,
+      submissions: hwSubs
+    });
+  }
+
+  // Student check
+  const student = user.studentProfile;
+  if (!student) {
+    return res.status(403).json({ error: 'No student profile.' });
+  }
+
+  // Class isolation check
+  if (hw.classId !== student.classId) {
+    return res.status(403).json({ error: 'Access denied. You cannot view homework for another class.' });
+  }
+
+  // Membership server check
+  const memberStatus = isMembershipActive(student.id);
+  if (!memberStatus.active) {
+    return res.status(403).json({
+      error: 'membership_expired',
+      message: 'Tuition membership expired. Complete payment to access this assignment.'
+    });
+  }
+
+  const mySub = submissions.find(s => s.homeworkId === hw.id && s.studentId === student.id);
+  return res.json({
+    homework: hw,
+    className: cls?.name,
+    mySubmission: mySub || null
+  });
+});
+
+// Teacher creates new daily homework
+router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ error: 'Only teacher can publish homework.' });
+  }
+
+  const {
+    classId,
+    batchIds,
+    subject,
+    chapter,
+    topic,
+    teachingSummary,
+    instructions,
+    publishDate,
+    deadlineDate,
+    maxMarks,
+    priority,
+    attachments,
+    referenceLinks,
+    isDraft
+  } = req.body;
+
+  if (!classId || !subject || !chapter || !teachingSummary || !instructions) {
+    return res.status(400).json({ error: 'Class, subject, chapter, teaching summary ("Aaj class mein kya padhaya"), and instructions are required.' });
+  }
+
+  const allHw = db.get('homework');
+  const newHw: Homework = {
+    id: `hw_${Date.now()}`,
+    classId,
+    batchIds: Array.isArray(batchIds) && batchIds.length > 0 ? batchIds : ['all'],
+    subject: subject.trim(),
+    chapter: chapter.trim(),
+    topic: topic?.trim() || '',
+    teachingSummary: teachingSummary.trim(),
+    instructions: instructions.trim(),
+    publishDate: publishDate || new Date().toISOString(),
+    deadlineDate: deadlineDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    maxMarks: Number(maxMarks) || 20,
+    priority: priority || 'normal',
+    attachments: Array.isArray(attachments) ? attachments : [],
+    referenceLinks: Array.isArray(referenceLinks) ? referenceLinks : [],
+    isDraft: !!isDraft,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  db.set('homework', [newHw, ...allHw]);
+
+  // If not draft, broadcast notification to all students in that class
+  if (!isDraft) {
+    const notifs = db.get('notifications');
+    const classes = db.get('classes');
+    const clsName = classes.find(c => c.id === classId)?.name || 'Your Class';
+    const newNotif: AppNotification = {
+      id: `notif_${Date.now()}`,
+      recipientId: `class:${classId}`,
+      title: `New Homework: ${newHw.subject} (${newHw.chapter})`,
+      message: `Er. Rajesh Sharma posted today's assignment for ${clsName}. Topic: ${newHw.topic || newHw.chapter}.`,
+      type: 'homework',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+    db.set('notifications', [newNotif, ...notifs]);
+  }
+
+  return res.status(201).json({ message: 'Homework published successfully', homework: newHw });
+});
+
+// Teacher updates homework
+router.put('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ error: 'Only teacher can edit homework.' });
+  }
+
+  const { id } = req.params;
+  const allHw = db.get('homework');
+  const index = allHw.findIndex(h => h.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Homework not found.' });
+  }
+
+  const updated: Homework = {
+    ...allHw[index],
+    ...req.body,
+    updatedAt: new Date().toISOString()
+  };
+
+  allHw[index] = updated;
+  db.set('homework', allHw);
+
+  return res.json({ message: 'Homework updated', homework: updated });
+});
+
+// Teacher deletes homework
+router.delete('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ error: 'Only teacher can delete homework.' });
+  }
+
+  const { id } = req.params;
+  const allHw = db.get('homework');
+  const filtered = allHw.filter(h => h.id !== id);
+  db.set('homework', filtered);
+
+  return res.json({ message: 'Homework deleted' });
+});
+
+// Teacher duplicates homework to another class/batch
+router.post('/:id/duplicate', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ error: 'Only teacher can duplicate homework.' });
+  }
+
+  const { id } = req.params;
+  const { targetClassId, targetBatchIds } = req.body;
+  const allHw = db.get('homework');
+  const source = allHw.find(h => h.id === id);
+  if (!source) {
+    return res.status(404).json({ error: 'Source homework not found.' });
+  }
+
+  const dup: Homework = {
+    ...source,
+    id: `hw_${Date.now()}`,
+    classId: targetClassId || source.classId,
+    batchIds: targetBatchIds || source.batchIds,
+    publishDate: new Date().toISOString(),
+    deadlineDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    isDraft: true, // safe default
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  db.set('homework', [dup, ...allHw]);
+  return res.status(201).json({ message: 'Homework duplicated as draft', homework: dup });
+});
+
+// Student submits homework
+router.post('/:id/submit', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const student = user.studentProfile;
+  if (!student) {
+    return res.status(403).json({ error: 'Only enrolled students can submit homework.' });
+  }
+
+  // Server membership check
+  const memberStatus = isMembershipActive(student.id);
+  if (!memberStatus.active) {
+    return res.status(403).json({
+      error: 'membership_expired',
+      message: 'Cannot submit homework: your tuition membership is overdue. Please renew first.'
+    });
+  }
+
+  const { id } = req.params;
+  const allHw = db.get('homework');
+  const hw = allHw.find(h => h.id === id);
+  if (!hw) {
+    return res.status(404).json({ error: 'Homework not found.' });
+  }
+
+  // Class isolation check
+  if (hw.classId !== student.classId) {
+    return res.status(403).json({ error: 'Cannot submit homework for another class.' });
+  }
+
+  const { solutionText, attachments } = req.body;
+  const submissions = db.get('submissions');
+  const existingIndex = submissions.findIndex(s => s.homeworkId === id && s.studentId === student.id);
+
+  const subObj: HomeworkSubmission = {
+    id: existingIndex !== -1 ? submissions[existingIndex].id : `sub_${Date.now()}`,
+    homeworkId: id,
+    studentId: student.id,
+    studentName: student.name,
+    rollNumber: student.rollNumber,
+    submissionDate: new Date().toISOString(),
+    solutionText: solutionText?.trim() || '',
+    attachments: Array.isArray(attachments) ? attachments : [],
+    status: 'submitted',
+    obtainedMarks: existingIndex !== -1 ? submissions[existingIndex].obtainedMarks : undefined,
+    teacherFeedback: existingIndex !== -1 ? submissions[existingIndex].teacherFeedback : undefined
+  };
+
+  if (existingIndex !== -1) {
+    submissions[existingIndex] = subObj;
+  } else {
+    submissions.push(subObj);
+  }
+
+  db.set('submissions', submissions);
+
+  // Notify teacher
+  const notifs = db.get('notifications');
+  db.set('notifications', [
+    {
+      id: `notif_${Date.now()}`,
+      recipientId: 'teacher',
+      title: 'Homework Submitted',
+      message: `${student.name} (${student.rollNumber}) submitted homework for ${hw.subject}: ${hw.chapter}.`,
+      type: 'homework',
+      read: false,
+      createdAt: new Date().toISOString()
+    },
+    ...notifs
+  ]);
+
+  return res.json({ message: 'Homework submitted successfully!', submission: subObj });
+});
+
+// Teacher grades and reviews submission
+router.post('/submissions/:subId/grade', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'teacher') {
+    return res.status(403).json({ error: 'Only teacher can grade submissions.' });
+  }
+
+  const { subId } = req.params;
+  const { status, marks, feedback } = req.body;
+
+  const submissions = db.get('submissions');
+  const index = submissions.findIndex(s => s.id === subId);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Submission not found.' });
+  }
+
+  submissions[index].status = status || 'completed';
+  if (marks !== undefined) {
+    submissions[index].obtainedMarks = Number(marks);
+  }
+  if (feedback !== undefined) {
+    submissions[index].teacherFeedback = feedback.trim();
+  }
+  submissions[index].gradedAt = new Date().toISOString();
+
+  db.set('submissions', submissions);
+
+  // Send notification to the student
+  const studentSub = submissions[index];
+  const notifs = db.get('notifications');
+  db.set('notifications', [
+    {
+      id: `notif_${Date.now()}`,
+      recipientId: studentSub.studentId,
+      title: `Homework Graded: ${status === 'completed' ? 'Passed' : status === 'needs_correction' ? 'Correction Required' : 'Reviewed'}`,
+      message: `Teacher gave ${marks !== undefined ? marks + ' marks' : 'feedback'}: "${feedback || 'Checked and reviewed'}"`,
+      type: 'homework',
+      read: false,
+      createdAt: new Date().toISOString()
+    },
+    ...notifs
+  ]);
+
+  return res.json({ message: 'Submission graded successfully', submission: submissions[index] });
+});
+
+export default router;
