@@ -3,12 +3,14 @@ import { apiFetch } from '../api';
 import { Users, CreditCard, BookOpen, AlertCircle, TrendingUp, Download, Plus, Clock } from 'lucide-react';
 import { PaymentReceipt } from '../types';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { useUiText } from '../context/UiTextContext';
 
 interface TeacherDashboardProps {
   onNavigate: (view: string) => void;
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }) => {
+  const { uiTexts } = useUiText();
   const [metrics, setMetrics] = useState<any>(null);
   const [recentPayments, setRecentPayments] = useState<any[]>([]);
   const [batchStats, setBatchStats] = useState<any[]>([]);
@@ -43,14 +45,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                Teacher Cabin & Control Center
+                {uiTexts.teacherCabinTitle || 'Teacher Cabin & Control Center'}
               </h1>
               <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg">
                 Admin Panel
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Er. Rajesh V. Sharma · Offline Batches & Digital Homework Oversight
+              {uiTexts.teacherName} · {uiTexts.teacherCabinSubtitle || 'Offline Batches & Digital Homework Oversight'}
             </p>
           </div>
 
@@ -60,7 +62,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
               className="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-md shadow-blue-500/25 flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
-              <span>Publish Daily Homework</span>
+              <span>{uiTexts.publishHomeworkPrompt || 'Publish Daily Homework'}</span>
             </button>
 
             <button

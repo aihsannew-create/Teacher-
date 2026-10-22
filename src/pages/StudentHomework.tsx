@@ -1,23 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
-import { Homework, HomeworkSubmission } from '../types';
-import { BookOpen, Clock, FileText, Download, CheckCircle2, Upload, X, ShieldAlert, Award, ExternalLink } from 'lucide-react';
+import { Homework, HomeworkSubmission, ClassLevel } from '../types';
+import {
+  BookOpen,
+  Clock,
+  FileText,
+  Download,
+  CheckCircle2,
+  Upload,
+  X,
+  ShieldAlert,
+  Award,
+  ExternalLink,
+  ArrowLeft,
+  Calendar,
+  Image as ImageIcon,
+  Maximize2,
+  Layers
+} from 'lucide-react';
 import { PaymentModal } from '../components/PaymentModal';
 
 interface StudentHomeworkProps {
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, extra?: any) => void;
 }
 
 export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) => {
   const { studentProfile, membership, refreshProfile } = useAuth();
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
+  const [classes, setClasses] = useState<ClassLevel[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>(studentProfile?.classId || 'all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [loading, setLoading] = useState(true);
   const [membershipExpired, setMembershipExpired] = useState(false);
   const [membershipWarning, setMembershipWarning] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
 
   // Submit Modal
   const [activeHwForSubmit, setActiveHwForSubmit] = useState<Homework | null>(null);
@@ -29,8 +48,12 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const fetchHomework = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch('/api/homework');
+      const [data, clsRes] = await Promise.all([
+        apiFetch(`/api/homework${selectedClass !== 'all' ? `?classId=${selectedClass}` : ''}`),
+        apiFetch('/api/classes').catch(() => ({ classes: [] }))
+      ]);
       setHomeworkList(data.homework || []);
+      setClasses(clsRes.classes || []);
       if (data.membershipWarning) {
         setMembershipWarning(data.membershipWarning.message);
       }
@@ -48,7 +71,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
 
   useEffect(() => {
     fetchHomework();
-  }, [membership]);
+  }, [membership, selectedClass]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -129,27 +152,93 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40 text-slate-800 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Page Header */}
+        {/* Page Header with Back Button */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-blue-100/90">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                Daily Classroom Homework
-              </h1>
-              <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg">
-                {studentProfile?.className || 'My Class'}
-              </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigate('back')}
+              className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 shadow-2xs transition-all cursor-pointer group"
+              title="Go Back"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  Daily Classroom Homework & Notes
+                </h1>
+                <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg">
+                  {studentProfile?.className || 'My Class'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                "Aaj class mein kya padhaya gaya", blackboard photos, homework instructions, and verified grading
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              "Aaj class mein kya padhaya gaya", instructions, notes, and teacher graded solutions
-            </p>
           </div>
 
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">Class Isolation:</span>
-            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              Verified for {studentProfile?.className} only
+            <span className="text-slate-500 font-medium">Enrolled Student:</span>
+            <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+              {studentProfile?.name} ({studentProfile?.rollNumber})
             </span>
+          </div>
+        </div>
+
+        {/* Class Selection Tabs ("Har Homework Class Ke Hisab Se") */}
+        <div className="p-4 rounded-2xl bg-white/90 backdrop-blur-xl border border-blue-100 shadow-xs space-y-2 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span className="text-slate-800 font-bold flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-blue-600" />
+              <span>Select Class to View Daily Homework ("Class Ke Hisab Se"):</span>
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Active: <strong className="text-blue-700">{selectedClass === 'all' ? 'All Classes' : classes.find(c => c.id === selectedClass)?.name || selectedClass}</strong>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              onClick={() => setSelectedClass('all')}
+              className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedClass === 'all'
+                  ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/20'
+                  : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-white hover:text-blue-600 hover:border-blue-200'
+              }`}
+            >
+              <span>🎓 All Classes</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedClass === 'all' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                {homeworkList.length}
+              </span>
+            </button>
+
+            {classes.map(c => {
+              const count = homeworkList.filter(h => h.classId === c.id).length;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedClass(c.id)}
+                  className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedClass === c.id
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/20'
+                      : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-white hover:text-blue-600 hover:border-blue-200'
+                  }`}
+                >
+                  <span>{c.name}</span>
+                  {c.id === studentProfile?.classId && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-emerald-500 text-white">
+                      MY CLASS
+                    </span>
+                  )}
+                  {selectedClass === 'all' && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -279,7 +368,9 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                               {hw.subject}
                             </span>
                             <span className="text-slate-300">·</span>
-                            <span className="text-slate-500 font-medium">Class: {hw.className}</span>
+                            <span className="px-2 py-0.5 rounded-md font-bold bg-blue-100 text-blue-800 text-[10px]">
+                              🎓 {hw.className}
+                            </span>
                             <span className="text-slate-300">·</span>
                             <span className="font-mono text-slate-500">Max {hw.maxMarks} Marks</span>
                           </div>
@@ -288,6 +379,18 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                           </h3>
                           <div className="text-xs text-blue-700 font-semibold mt-0.5">
                             Topic: {hw.topic || 'General Practice'}
+                          </div>
+
+                          {/* Published Date & Time Info */}
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-2 font-medium">
+                            <span className="flex items-center gap-1 text-slate-600">
+                              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Class Date: <strong>{new Date(hw.publishDate || hw.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                            </span>
+                            <span className="flex items-center gap-1 text-slate-600">
+                              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Lecture Time: <strong>{new Date(hw.publishDate || hw.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+                            </span>
                           </div>
                         </div>
 
@@ -339,27 +442,59 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                         </p>
                       </div>
 
-                      {/* Attachments & Reference Links */}
-                      {((hw.attachments && hw.attachments.length > 0) || (hw.referenceLinks && hw.referenceLinks.length > 0)) && (
+                      {/* Attached Blackboard Photos / Worksheets Gallery */}
+                      {hw.attachments && hw.attachments.some(a => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i)) && (
+                        <div className="pt-2 border-t border-slate-100 space-y-2">
+                          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-blue-600" />
+                            <span>Blackboard Photos & Handwritten Notes (Click to Zoom):</span>
+                          </div>
+                          <div className="flex flex-wrap gap-3">
+                            {hw.attachments
+                              .filter(att => att.fileType === 'image' || att.fileUrl?.startsWith('data:image') || att.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))
+                              .map((att, idx) => (
+                                <div
+                                  key={att.id || idx}
+                                  onClick={() => setViewingImage({ url: att.fileUrl, title: `${hw.subject} - ${att.name}` })}
+                                  className="group relative cursor-pointer rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 hover:border-blue-400 shadow-2xs hover:shadow-md transition-all w-28 sm:w-36 aspect-4/3"
+                                >
+                                  <img src={att.fileUrl} alt={att.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                  <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-bold gap-1">
+                                    <Maximize2 className="w-3.5 h-3.5" />
+                                    <span>Zoom</span>
+                                  </div>
+                                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-1 text-[9px] text-white truncate px-1.5">
+                                    {att.name}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PDF Documents & Reference Links */}
+                      {((hw.attachments && hw.attachments.some(a => a.fileType !== 'image' && !a.fileUrl?.startsWith('data:image') && !a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))) || (hw.referenceLinks && hw.referenceLinks.length > 0)) && (
                         <div className="pt-2 border-t border-slate-100 space-y-2">
                           <div className="text-xs font-bold text-slate-600">
-                            Downloadable Notes & Worksheets:
+                            Downloadable PDFs & Reference Links:
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {hw.attachments?.map((att, idx) => (
-                              <a
-                                key={idx}
-                                href={att.fileUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-xs text-slate-700 hover:border-blue-400 hover:text-blue-700 shadow-2xs transition-colors"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                                <span className="font-semibold truncate max-w-[200px]">{att.name}</span>
-                                {att.size && <span className="text-[10px] text-slate-400">({att.size})</span>}
-                                <Download className="w-3 h-3 text-slate-400" />
-                              </a>
-                            ))}
+                            {hw.attachments
+                              ?.filter(a => a.fileType !== 'image' && !a.fileUrl?.startsWith('data:image') && !a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))
+                              .map((att, idx) => (
+                                <a
+                                  key={idx}
+                                  href={att.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-xs text-slate-700 hover:border-blue-400 hover:text-blue-700 shadow-2xs transition-colors"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                  <span className="font-semibold truncate max-w-[200px]">{att.name}</span>
+                                  {att.size && <span className="text-[10px] text-slate-400">({att.size})</span>}
+                                  <Download className="w-3 h-3 text-slate-400" />
+                                </a>
+                              ))}
 
                             {hw.referenceLinks?.map((link, idx) => (
                               <a
@@ -560,6 +695,53 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
           fetchHomework();
         }}
       />
+
+      {/* ================= MODAL: FULL RESOLUTION IMAGE LIGHTBOX ================= */}
+      {viewingImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in"
+          onClick={() => setViewingImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[92vh] w-full bg-slate-900 rounded-3xl p-3 sm:p-4 overflow-hidden border border-slate-700 shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 px-2 border-b border-slate-800 text-white">
+              <div className="flex items-center gap-2 truncate max-w-[85%]">
+                <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold truncate">{viewingImage.title}</span>
+              </div>
+              <button
+                onClick={() => setViewingImage(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Lightbox"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-auto max-h-[78vh] flex items-center justify-center p-2 bg-black/40 rounded-2xl my-2">
+              <img
+                src={viewingImage.url}
+                alt={viewingImage.title}
+                className="max-w-full max-h-[74vh] object-contain rounded-xl shadow-lg"
+              />
+            </div>
+            <div className="flex items-center justify-between px-2 pt-2 text-[11px] text-slate-400">
+              <span>Full High-Resolution Blackboard / Notes Preview</span>
+              <a
+                href={viewingImage.url}
+                download={viewingImage.title}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+              >
+                <Maximize2 className="w-3 h-3" />
+                <span>Open in Tab</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

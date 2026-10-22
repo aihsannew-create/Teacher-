@@ -1,10 +1,11 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUiText } from '../context/UiTextContext';
 import { BookOpen, LogOut, Bell, Shield, KeyRound } from 'lucide-react';
 
 interface NavbarProps {
   currentView: string;
-  setCurrentView: (view: string) => void;
+  setCurrentView: (view: string, extra?: any) => void;
   onOpenNotifications?: () => void;
   unreadCount?: number;
 }
@@ -16,6 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   unreadCount = 0
 }) => {
   const { user, studentProfile, logout } = useAuth();
+  const { uiTexts } = useUiText();
 
   const handleBrandClick = () => {
     if (!user) {
@@ -43,10 +45,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <span className="text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors whitespace-nowrap">
-                Prerna Tuition OS
+                {uiTexts.brandName || 'Prerna Tuition OS'}
               </span>
               <span className="hidden sm:block text-[11px] text-blue-600 font-bold tracking-wide">
-                {user?.role === 'owner' ? '👑 Owner Control System' : 'Offline Coaching & Daily HW'}
+                {user?.role === 'owner' ? '👑 Owner Control System' : (uiTexts.brandTagline || 'Offline Coaching & Daily HW')}
               </span>
             </div>
           </button>
@@ -60,19 +62,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setCurrentView('landing')}
                 className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'landing' ? 'text-blue-600 font-bold' : ''}`}
               >
-                Overview
+                {uiTexts.navHome || 'Overview'}
               </button>
               <button
                 onClick={() => setCurrentView('classes-info')}
                 className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'classes-info' ? 'text-blue-600 font-bold' : ''}`}
               >
-                Classes & Fees
+                {uiTexts.navClasses || 'Classes & Fees'}
+              </button>
+              <button
+                onClick={() => setCurrentView('login', { intent: 'homework' })}
+                className={`whitespace-nowrap transition-colors hover:text-blue-600 flex items-center gap-1.5 ${currentView === 'login' ? 'text-blue-600 font-bold' : ''}`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                <span>Homework (Class Diary)</span>
               </button>
               <button
                 onClick={() => setCurrentView('about-teacher')}
                 className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'about-teacher' ? 'text-blue-600 font-bold' : ''}`}
               >
-                Faculty
+                {uiTexts.navFaculty || 'Faculty'}
               </button>
             </>
           ) : user.role === 'owner' ? (
@@ -220,10 +229,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setCurrentView('login', { intent: 'homework' })}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/90 rounded-xl transition-all shadow-2xs whitespace-nowrap cursor-pointer"
+                title="Daily Homework & Class Diary (Student & Admin Login)"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Homework</span>
+              </button>
+              <button
                 onClick={() => setCurrentView('login')}
                 className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-all shadow-md shadow-blue-500/25 whitespace-nowrap cursor-pointer"
               >
-                Login
+                {uiTexts.navLogin || 'Login'}
               </button>
             </div>
           )}

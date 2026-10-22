@@ -5,6 +5,50 @@ import { User, StudentProfile, Membership } from '../types';
 
 const router = Router();
 
+interface LockoutRecord {
+  failedAttempts: number;
+  lockoutTier: number;
+  lockedUntil: number; // epoch ms
+}
+
+// In-memory security tracker keyed by normalized identifier + client IP
+const loginSecurityMap = new Map<string, LockoutRecord>();
+
+function getLockoutDurationMs(tier: number): number {
+  if (tier === 1) return 1 * 60 * 1000; // 1st tier (after 5 fails): 1 minute
+  if (tier === 2) return 10 * 60 * 1000; // 2nd tier (after 10 fails): 10 minutes
+  if (tier === 3) return 30 * 60 * 1000; // 3rd tier (after 15 fails): 30 minutes
+  return 60 * 60 * 1000; // 4th+ tier: 60 minutes
+}
+
+function getLockoutDurationMinutes(tier: number): number {
+  if (tier === 1) return 1;
+  if (tier === 2) return 10;
+  if (tier === 3) return 30;
+  return 60;
+}
+
+// Check lockout status for client-side pre-fill
+router.get('/lockout-status', (req, res: Response) => {
+  const identifier = ((req.query.identifier as string) || '').trim().toLowerCase();
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'ip';
+  const trackerKey = `${identifier}_${clientIp}`;
+  const record = loginSecurityMap.get(trackerKey);
+
+  if (record && record.lockedUntil > Date.now()) {
+    const remainingSeconds = Math.ceil((record.lockedUntil - Date.now()) / 1000);
+    return res.json({
+      isLocked: true,
+      remainingSeconds,
+      lockedUntil: record.lockedUntil,
+      lockoutTier: record.lockoutTier,
+      failedAttempts: record.failedAttempts
+    });
+  }
+
+  return res.json({ isLocked: false, remainingSeconds: 0, failedAttempts: record?.failedAttempts || 0 });
+});
+
 // Login
 router.post('/login', (req, res: Response) => {
   const { emailOrPhone, password } = req.body;
@@ -13,6 +57,30 @@ router.post('/login', (req, res: Response) => {
   }
 
   const clean = emailOrPhone.trim().toLowerCase();
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'ip';
+  const trackerKey = `${clean}_${clientIp}`;
+
+  let secRecord = loginSecurityMap.get(trackerKey);
+  if (!secRecord) {
+    secRecord = { failedAttempts: 0, lockoutTier: 0, lockedUntil: 0 };
+    loginSecurityMap.set(trackerKey, secRecord);
+  }
+
+  // 1. Verify if account/IP is currently under progressive security lockout
+  if (secRecord.lockedUntil > Date.now()) {
+    const remainingSeconds = Math.ceil((secRecord.lockedUntil - Date.now()) / 1000);
+    const durationMins = getLockoutDurationMinutes(secRecord.lockoutTier);
+    return res.status(429).json({
+      error: `Security Lock Active: 5 incorrect password attempts. Please wait ${remainingSeconds}s before trying again.`,
+      code: 'SECURITY_LOCKOUT',
+      lockedUntil: secRecord.lockedUntil,
+      remainingSeconds,
+      lockoutTier: secRecord.lockoutTier,
+      failedAttempts: secRecord.failedAttempts,
+      durationMinutes: durationMins
+    });
+  }
+
   const users = db.get('users');
   let user = users.find(
     u => u.email.toLowerCase() === clean || 
@@ -28,8 +96,38 @@ router.post('/login', (req, res: Response) => {
   const isOwnerAuth = (user?.role === 'owner' || clean === 'aihsan') && password === '990584';
 
   if (!user || (!isOwnerAuth && user.passwordHash !== password)) {
-    return res.status(401).json({ error: 'Invalid credentials. Please verify your username and password.' });
+    secRecord.failedAttempts += 1;
+
+    // Trigger progressive lockout every 5 failed attempts
+    if (secRecord.failedAttempts % 5 === 0) {
+      secRecord.lockoutTier += 1;
+      const durationMs = getLockoutDurationMs(secRecord.lockoutTier);
+      const durationMins = getLockoutDurationMinutes(secRecord.lockoutTier);
+      secRecord.lockedUntil = Date.now() + durationMs;
+      const remainingSeconds = Math.ceil(durationMs / 1000);
+
+      return res.status(429).json({
+        error: `Security Lockout Triggered: 5 failed password attempts. Account locked for ${durationMins} minute${durationMins > 1 ? 's' : ''}.`,
+        code: 'SECURITY_LOCKOUT',
+        lockedUntil: secRecord.lockedUntil,
+        remainingSeconds,
+        lockoutTier: secRecord.lockoutTier,
+        failedAttempts: secRecord.failedAttempts,
+        durationMinutes: durationMins
+      });
+    }
+
+    const attemptsLeft = 5 - (secRecord.failedAttempts % 5);
+    return res.status(401).json({
+      error: `Invalid credentials. Please verify your username and password. (${attemptsLeft} attempt${attemptsLeft > 1 ? 's' : ''} left before ${getLockoutDurationMinutes(secRecord.lockoutTier + 1)} min security lock).`,
+      code: 'INVALID_CREDENTIALS',
+      attemptsLeft,
+      failedAttempts: secRecord.failedAttempts
+    });
   }
+
+  // Password is correct! Reset failed attempts for this user/IP
+  loginSecurityMap.delete(trackerKey);
 
   // Teacher login access check (Owner can revoke teacher login)
   if (user.role === 'teacher' && user.loginAccessGranted === false) {
@@ -255,14 +353,14 @@ router.post('/register', (req, res: Response) => {
 // Current user details
 router.get('/me', (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
-    return res.status(401).json({ user: null });
+    return res.json({ user: null, studentProfile: null, membership: null });
   }
 
   // Refetch latest from DB to ensure up-to-date state
   const users = db.get('users');
   const user = users.find(u => u.id === req.user!.userId);
   if (!user) {
-    return res.status(401).json({ user: null });
+    return res.json({ user: null, studentProfile: null, membership: null });
   }
 
   let studentProfile: StudentProfile | undefined;

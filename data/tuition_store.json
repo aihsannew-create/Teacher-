@@ -2,11 +2,11 @@
   "users": [
     {
       "id": "usr_owner_01",
-      "email": "owner@prerna.edu",
-      "name": "Shri Vijayendra Singhania",
-      "phone": "9800000001",
+      "email": "aihsan",
+      "name": "AIHSAN ANSARI",
+      "phone": "9905847357",
       "role": "owner",
-      "passwordHash": "owner123",
+      "passwordHash": "990584",
       "createdAt": "2025-06-01T00:00:00.000Z",
       "loginAccessGranted": true
     },
@@ -154,6 +154,17 @@
   ],
   "classes": [
     {
+      "id": "cls_08",
+      "name": "Class 8 (Pre-Foundation Batch)",
+      "code": "CLS-08",
+      "subjects": [
+        "Mathematics",
+        "Science"
+      ],
+      "monthlyFee": 1800,
+      "description": "Pre-foundation batch strengthening rational numbers, linear equations, algebra, and physics fundamentals."
+    },
+    {
       "id": "cls_10",
       "name": "Class 10 (Board Excellence)",
       "code": "CLS-10",
@@ -240,9 +251,57 @@
         "Daily"
       ],
       "maxCapacity": 20
+    },
+    {
+      "id": "batch_08_evening",
+      "classId": "cls_08",
+      "name": "Batch 8-Pre-Foundation (3:00 PM - 4:15 PM)",
+      "timing": "03:00 PM - 04:15 PM",
+      "days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ],
+      "maxCapacity": 20
     }
   ],
   "homework": [
+    {
+      "id": "hw_cls08_linear_01",
+      "classId": "cls_08",
+      "batchIds": [
+        "all"
+      ],
+      "subject": "Mathematics",
+      "chapter": "Chapter 2: Linear Equations in One Variable",
+      "topic": "Solving Equations with Variables on Both Sides",
+      "teachingSummary": "Aaj class mein humne variables on both sides wali linear equations ko solve karna seekha. Transposition method aur LCM method se fractions simplify kiye. Blackboard par 4 board level questions step-by-step solve karwaye.",
+      "instructions": "1. NCERT Exercise 2.3 ke Question 1 se 10 complete karein.\n2. Blackboard par note kiye gaye 2 special questions solve karke copy ki photo upload karein.\n3. Fair homework copy me step-by-step calculations dikhayein.",
+      "publishDate": "2026-10-22T10:00:00.000Z",
+      "deadlineDate": "2026-10-23T08:00:00.000Z",
+      "maxMarks": 20,
+      "priority": "high",
+      "attachments": [
+        {
+          "id": "att_cls8_board_notes",
+          "name": "Class8_Blackboard_Notes_LinearEq.jpg",
+          "fileType": "image",
+          "fileUrl": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80",
+          "size": "320 KB"
+        }
+      ],
+      "referenceLinks": [
+        {
+          "title": "NCERT Solutions Class 8 Ch-2",
+          "url": "https://ncert.nic.in"
+        }
+      ],
+      "isDraft": false,
+      "createdAt": "2026-10-22T09:45:00.000Z",
+      "updatedAt": "2026-10-22T09:45:00.000Z"
+    },
     {
       "id": "hw_cls10_quad_01",
       "classId": "cls_10",
@@ -548,6 +607,15 @@
   ],
   "notifications": [
     {
+      "id": "notif_1792691986168",
+      "recipientId": "class:cls_10",
+      "title": "New Homework: Mathematics (Test Topic Deletion)",
+      "message": "Daily homework and teaching summary posted for Class 10 (Board Excellence). Topic: Quadratic Equations Drill.",
+      "type": "homework",
+      "read": false,
+      "createdAt": "2026-10-22T17:59:46.168Z"
+    },
+    {
       "id": "notif_01",
       "recipientId": "all",
       "title": "New Homework Published: Mathematics (Quadratic Equations)",
@@ -602,7 +670,118 @@
       "accountName": "Prerna Tuition Academy / R V Sharma"
     },
     "razorpayKeyId": "rzp_test_PrernaTuition2026",
-    "razorpayKeySecret": "test_secret_prerna9981"
+    "razorpayKeySecret": "test_secret_prerna9981",
+    "landingContent": {
+      "heroTitle": "AIHSAN ANSARI",
+      "heroTagline": "A simple tool for teachers to manage assignments and for students to stay on top of their work.",
+      "contactPhone": "9905847357",
+      "stat1Value": "10+",
+      "stat1Label": "Years Board Coaching",
+      "stat2Value": "98.4%",
+      "stat2Label": "Board Pass Excellence",
+      "stat3Value": "25 Max",
+      "stat3Label": "Students Per Batch",
+      "journeyTitle": "Your Learning Journey Starts Here.",
+      "journeySubtitle": "Everything you need to learn, practice, and stay ahead — all in one place.",
+      "journeyPoints": [
+        "Homework & Assignments",
+        "Study Materials & Notes",
+        "Progress Tracking",
+        "Secure Student Access"
+      ],
+      "hybridFeature1Title": "\"Aaj Class Mein Kya Padhaya Gaya\"",
+      "hybridFeature1Desc": "After every offline lecture, the teacher publishes the exact concept summary and key formulas taught that day. Absent or revising students are never left behind.",
+      "hybridFeature2Title": "Daily Photo/PDF Solution Uploads",
+      "hybridFeature2Desc": "Students solve problems in fair notebooks and submit clear pictures before the next morning's deadline. Teacher reviews and assigns verified marks with corrections.",
+      "hybridFeature3Title": "Transparent Fee Receipts & Validity",
+      "hybridFeature3Desc": "No disputes over unrecorded cash or pending dates. Pay online or in person; receive official computer-verified receipts with exact membership validity and next due dates."
+    },
+    "uiTexts": {
+      "brandName": "Prerna Tuition OS",
+      "brandTagline": "Offline Coaching & Daily Homework Platform",
+      "navHome": "Overview",
+      "navClasses": "Classes & Fees",
+      "navFaculty": "Faculty",
+      "navLogin": "Login",
+      "navStudentPortal": "Student Portal",
+      "navTeacherCabin": "Teacher Cabin",
+      "navOwnerCabin": "Owner Cabin",
+      "heroTitle": "AIHSAN ANSARI",
+      "heroTagline": "A simple tool for teachers to manage assignments and for students to stay on top of their work.",
+      "heroSubjects": "Mathematics, Science, English, Hindi",
+      "heroCtaStudentLogin": "Student Homework Login",
+      "heroCtaExploreClasses": "Explore Classes & Fees",
+      "heroCtaTeacherCabin": "Teacher Cabin",
+      "stat1Value": "10+",
+      "stat1Label": "Years Board Coaching",
+      "stat2Value": "98.4%",
+      "stat2Label": "Board Pass Excellence",
+      "stat3Value": "25 Max",
+      "stat3Label": "Students Per Batch",
+      "stat4Value": "100%",
+      "stat4Label": "Daily Homework Verified",
+      "featuresSectionTitle": "Why Our Offline Coaching Outperforms",
+      "featuresSectionSubtitle": "Bridging physical classroom teaching with rigorous daily digital accountability.",
+      "feature1Title": "\"Aaj Class Mein Kya Padhaya Gaya\"",
+      "feature1Desc": "After every offline lecture, the teacher publishes the exact concept summary and key formulas taught that day. Absent or revising students are never left behind.",
+      "feature2Title": "Daily Photo/PDF Solution Uploads",
+      "feature2Desc": "Students solve problems in fair notebooks and submit clear pictures before the next morning's deadline. Teacher reviews and assigns verified marks with corrections.",
+      "feature3Title": "Transparent Fee Receipts & Validity",
+      "feature3Desc": "No disputes over unrecorded cash or pending dates. Pay online or in person; receive official computer-verified receipts with exact membership validity and next due dates.",
+      "feature4Title": "Daily Attendance & Instant Alerts",
+      "feature4Desc": "Real-time attendance record keeping. Parents and students can monitor regular attendance logs with automatic alerts for absences or late arrivals.",
+      "journeyTitle": "Your Learning Journey Starts Here.",
+      "journeySubtitle": "Everything you need to learn, practice, and stay ahead — all in one place.",
+      "journeyPoints": [
+        "Homework & Assignments",
+        "Study Materials & Notes",
+        "Progress Tracking",
+        "Secure Student Access"
+      ],
+      "enquiryCardTitle": "Direct Admission / Trial Enquiry",
+      "enquiryCardSubtitle": "Fill details to chat directly with faculty / owner on WhatsApp",
+      "enquiryButtonText": "Send Enquiry on WhatsApp",
+      "teacherName": "Er. Rajesh V. Sharma (M.Tech, 14+ Yrs Exp)",
+      "teacherTitle": "Senior Mathematics & Physics Faculty",
+      "teacherBio": "Dedicated to building strong foundational concepts in Science and Mathematics for board exam toppers and competitive aspirants since 2012.",
+      "teacherExperience": "14+ Years Teaching Experience",
+      "classLevelsSummary": "Class 8 to Class 12 (CBSE / ICSE / State Board)",
+      "contactPhone": "9905847357",
+      "contactEmail": "contact@prerna.edu",
+      "contactAddress": "Cabin 304, Sharda Complex, Near City Library, MG Road, Pune, Maharashtra 411001",
+      "footerCopyright": "© 2026 Prerna Tuition Academy. All rights reserved.",
+      "footerNotice": "Designed for disciplined offline coaching with modern student digital tracking.",
+      "studentWelcomeTitle": "Student Learning Desk",
+      "studentWelcomeSubtitle": "Complete your daily homework, check grades, and track your attendance.",
+      "homeworkGuidance": "Upload clear photos or PDFs of your solved fair notebook before deadline.",
+      "feeExpiredWarning": "Your monthly tuition membership has expired. Please clear dues to continue homework submissions.",
+      "gracePeriodNote": "3 Days Grace Period Allowed Before Homework Submission Locks.",
+      "teacherCabinTitle": "Faculty Academic Cabin",
+      "teacherCabinSubtitle": "Publish daily class summaries, grade homework submissions, and track class attendance.",
+      "publishHomeworkPrompt": "\"Aaj Class Mein Kya Padhaya Gaya\" - Daily Concept Summary",
+      "faqs": [
+        {
+          "q": "How does daily homework submission and checking work?",
+          "a": "After every physical lecture, the teacher publishes daily key concepts. Students solve the practice problems in their notebooks, upload photos or PDFs directly through their student login, and receive verified marks and corrections before the next day's lecture."
+        },
+        {
+          "q": "Which classes and subjects are covered?",
+          "a": "We provide comprehensive coaching for Mathematics, Science (Physics, Chemistry, Biology), English, and Hindi for Classes 8, 9, 10, 11, and 12 across CBSE, ICSE, and State Boards."
+        },
+        {
+          "q": "How can parents and students track fee payments and attendance?",
+          "a": "The portal automatically tracks attendance daily and provides computer-generated fee receipts, active membership validity dates, and advance renewal reminders with zero manual calculation errors."
+        },
+        {
+          "q": "How can I contact for admissions or offline classroom visits?",
+          "a": "You can reach out directly to AIHSAN ANSARI via phone or WhatsApp at +91 99058 47357 for trial class bookings, batch schedules, and fee details."
+        },
+        {
+          "q": "Who provides login credentials for students and teachers?",
+          "a": "All logins are generated and managed strictly by the Institute Owner through the administrative cabin to ensure authorized, secure access."
+        }
+      ]
+    }
   },
   "auditLogs": [
     {

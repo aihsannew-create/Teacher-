@@ -15,6 +15,7 @@ import {
   TeacherSettings,
   AuditLog
 } from './types';
+import { defaultAllUiTexts } from './uiTextDefaults';
 
 export interface DatabaseSchema {
   users: User[];
@@ -64,6 +65,7 @@ const defaultSettings: TeacherSettings = {
   },
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_PrernaTuition2026',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || 'test_secret_prerna9981',
+  uiTexts: defaultAllUiTexts,
   landingContent: {
     heroTitle: 'AIHSAN ANSARI',
     heroTagline: 'A simple tool for teachers to manage assignments and for students to stay on top of their work.',
@@ -163,6 +165,14 @@ function getInitialSeed(): DatabaseSchema {
   };
 
   const classes: ClassLevel[] = [
+    {
+      id: 'cls_08',
+      name: 'Class 8 (Pre-Foundation Batch)',
+      code: 'CLS-08',
+      subjects: ['Mathematics', 'Science'],
+      monthlyFee: 1800,
+      description: 'Strengthening fundamental arithmetic, algebra, rational numbers, and science basics.'
+    },
     {
       id: 'cls_10',
       name: 'Class 10 (Board Excellence)',
@@ -714,6 +724,19 @@ class Store {
         if (!parsed.settings.landingContent) {
           parsed.settings.landingContent = defaultSettings.landingContent;
           updated = true;
+        }
+
+        // Ensure uiTexts is present and fully populated with defaultAllUiTexts
+        if (!parsed.settings.uiTexts) {
+          parsed.settings.uiTexts = defaultAllUiTexts;
+          updated = true;
+        } else {
+          // Merge in any missing fields from defaultAllUiTexts
+          let mergedTexts = { ...defaultAllUiTexts, ...parsed.settings.uiTexts };
+          if (JSON.stringify(mergedTexts) !== JSON.stringify(parsed.settings.uiTexts)) {
+            parsed.settings.uiTexts = mergedTexts;
+            updated = true;
+          }
         }
 
         // Ensure teacher has loginAccessGranted

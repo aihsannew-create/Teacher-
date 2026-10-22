@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUiText } from '../context/UiTextContext';
 import { apiFetch } from '../api';
 import { Homework, PaymentReceipt } from '../types';
 import { BookOpen, CalendarCheck, CreditCard, AlertTriangle, CheckCircle2, Clock, ChevronRight, ShieldAlert } from 'lucide-react';
@@ -12,6 +13,7 @@ interface StudentDashboardProps {
 
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }) => {
   const { user, studentProfile, membership, refreshProfile } = useAuth();
+  const { uiTexts } = useUiText();
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [membershipExpired, setMembershipExpired] = useState(false);
@@ -108,7 +110,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
                   Monthly Tuition Membership Expired
                 </h3>
                 <p className="text-xs text-red-800/90 mt-1 max-w-xl">
-                  Daily homework, teaching summaries, and submission privileges are paused until your monthly coaching fee is cleared. Please renew online to resume immediate access.
+                  {uiTexts.feeExpiredWarning || 'Daily homework, teaching summaries, and submission privileges are paused until your monthly coaching fee is cleared. Please renew online to resume immediate access.'}
                 </p>
               </div>
             </div>

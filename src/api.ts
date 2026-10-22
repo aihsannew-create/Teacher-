@@ -39,6 +39,9 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      setStoredToken(null);
+    }
     const errorMsg = data?.error || data?.message || `HTTP ${response.status}: ${response.statusText}`;
     const err: any = new Error(errorMsg);
     err.status = response.status;

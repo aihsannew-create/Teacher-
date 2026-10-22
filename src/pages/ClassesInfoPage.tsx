@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../api';
 import { ClassLevel, Batch } from '../types';
 import { Clock, Users, ArrowLeft } from 'lucide-react';
+import { useUiText } from '../context/UiTextContext';
 
 interface ClassesInfoPageProps {
   onNavigate: (view: string) => void;
 }
 
 export const ClassesInfoPage: React.FC<ClassesInfoPageProps> = ({ onNavigate }) => {
+  const { uiTexts } = useUiText();
   const [classes, setClasses] = useState<ClassLevel[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,13 +38,13 @@ export const ClassesInfoPage: React.FC<ClassesInfoPageProps> = ({ onNavigate }) 
             className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 mb-3"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Overview</span>
+            <span>{uiTexts.navHome || 'Back to Overview'}</span>
           </button>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Coaching Batches, Timings & Transparent Fees
+            {uiTexts.brandName} Batches, Timings & Transparent Fees
           </h1>
           <p className="text-sm text-slate-600 mt-2 max-w-2xl">
-            Offline classroom coaching with small batch sizes (capped at 20-25 students) to ensure every student receives personal focus, doubt resolution, and daily verified homework correction.
+            {uiTexts.journeySubtitle || 'Offline classroom coaching with small batch sizes to ensure every student receives personal focus, doubt resolution, and daily verified homework correction.'}
           </p>
         </div>
 
@@ -128,6 +130,24 @@ export const ClassesInfoPage: React.FC<ClassesInfoPageProps> = ({ onNavigate }) 
             })}
           </div>
         )}
+
+        {/* Dynamic Direct Inquiry Card */}
+        <div className="rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-blue-900/15">
+          <div className="space-y-1 text-center md:text-left">
+            <h3 className="text-lg font-black tracking-tight">{uiTexts.enquiryCardTitle}</h3>
+            <p className="text-xs sm:text-sm text-blue-100 max-w-xl">
+              {uiTexts.enquiryCardSubtitle}
+            </p>
+          </div>
+          <a
+            href={`https://wa.me/91${uiTexts.contactPhone.replace(/\D/g, '')}?text=Hello%20${encodeURIComponent(uiTexts.teacherName)},%20I%20want%20to%20enquire%20about%20offline%20batch%20admission`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-3 rounded-2xl bg-white text-blue-800 hover:bg-blue-50 text-xs sm:text-sm font-black transition-all shadow-md shrink-0 flex items-center gap-2"
+          >
+            <span>💬 {uiTexts.enquiryButtonText}</span>
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -32,16 +32,21 @@ router.get('/', requireAuth, requireTeacher, (req: AuthenticatedRequest, res: Re
     );
   }
 
+  const users = db.get('users');
   const enriched = students.map(student => {
     const mem = memberships.find(m => m.studentId === student.id);
     const cls = classes.find(c => c.id === student.classId);
     const bth = batches.find(b => b.id === student.batchId);
+    const user = users.find(u => u.id === student.userId || u.email.toLowerCase() === student.email.toLowerCase());
     return {
       ...student,
       className: cls ? cls.name : 'Unknown Class',
       batchName: bth ? bth.name : 'Unassigned',
       monthlyFee: student.customFee || (cls ? cls.monthlyFee : 2500),
-      membership: mem || null
+      membership: mem || null,
+      userEmail: user ? user.email : student.email,
+      passwordPreview: user ? user.passwordHash : 'student123',
+      loginAccessGranted: student.loginAccessGranted !== false && user?.loginAccessGranted !== false
     };
   });
 
@@ -62,7 +67,8 @@ router.post('/', requireAuth, requireTeacher, (req: AuthenticatedRequest, res: R
     guardianRelation,
     customFee,
     notes,
-    initialStatus
+    initialStatus,
+    password
   } = req.body;
 
   if (!name || !email || !classId) {
@@ -79,13 +85,16 @@ router.post('/', requireAuth, requireTeacher, (req: AuthenticatedRequest, res: R
   const studentId = `stu_${Date.now()}`;
   const generatedRoll = rollNumber?.trim() || `PTA-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const isApproved = initialStatus !== 'pending_approval';
+
   const newUser: User = {
     id: userId,
     email: email.trim().toLowerCase(),
     name: name.trim(),
     phone: phone?.trim() || '',
     role: 'student',
-    passwordHash: 'student123', // Default initial password
+    passwordHash: password?.trim() || 'student123', // Initial password
+    loginAccessGranted: isApproved,
     createdAt: new Date().toISOString()
   };
 
@@ -103,6 +112,7 @@ router.post('/', requireAuth, requireTeacher, (req: AuthenticatedRequest, res: R
     guardianRelation: guardianRelation?.trim() || 'Parent',
     enrollmentDate: new Date().toISOString().split('T')[0],
     status: initialStatus || 'active',
+    loginAccessGranted: isApproved,
     customFee: customFee ? Number(customFee) : undefined,
     notes: notes?.trim() || ''
   };
@@ -218,6 +228,37 @@ router.get('/:id/history', requireAuth, requireTeacher, (req: AuthenticatedReque
     submissions,
     attendance,
     receipts
+  });
+});
+
+// Delete student account permanently (Teacher / Owner)
+router.delete('/:id', requireAuth, requireTeacher, (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const students = db.get('students');
+  const targetStudent = students.find(s => s.id === id);
+
+  if (!targetStudent) {
+    return res.status(404).json({ error: 'Student not found.' });
+  }
+
+  const users = db.get('users');
+  const updatedStudents = students.filter(s => s.id !== id);
+  const updatedUsers = users.filter(u => u.id !== targetStudent.userId && u.email.toLowerCase() !== targetStudent.email.toLowerCase());
+
+  const updatedMemberships = db.get('memberships').filter(m => m.studentId !== id);
+  const updatedSubmissions = db.get('submissions').filter(s => s.studentId !== id);
+  const updatedAttendance = db.get('attendance').filter(a => a.studentId !== id);
+  const updatedReceipts = db.get('receipts').filter(r => r.studentId !== id);
+
+  db.set('students', updatedStudents);
+  db.set('users', updatedUsers);
+  db.set('memberships', updatedMemberships);
+  db.set('submissions', updatedSubmissions);
+  db.set('attendance', updatedAttendance);
+  db.set('receipts', updatedReceipts);
+
+  return res.json({
+    message: `Student "${targetStudent.name}" (${targetStudent.rollNumber}) deleted successfully.`
   });
 });
 

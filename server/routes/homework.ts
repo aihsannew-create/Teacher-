@@ -39,7 +39,7 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const classes = db.get('classes');
   const batches = db.get('batches');
 
-  if (user.role === 'teacher') {
+  if (user.role === 'teacher' || user.role === 'owner') {
     const { classId, batchId, status } = req.query;
     let list = [...allHw];
 
@@ -55,7 +55,7 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
       list = list.filter(h => !h.isDraft);
     }
 
-    // Attach submission statistics for teacher
+    // Attach submission statistics for teacher / owner
     const enriched = list.map(hw => {
       const cls = classes.find(c => c.id === hw.classId);
       const hwSubs = submissions.filter(s => s.homeworkId === hw.id);
@@ -74,7 +74,7 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     return res.json({ homework: enriched });
   }
 
-  // Student portal: Strict Class Isolation & Server-Side Membership Check
+  // Student portal: Class-Wise Homework & Membership Check
   const student = user.studentProfile;
   if (!student) {
     return res.status(403).json({ error: 'No student profile linked to this account.' });
@@ -98,20 +98,24 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     });
   }
 
-  // 2. Class Isolation: Only show homework assigned to the student's class and batch
+  // 2. Class Selection: Defaults to student's enrolled class, or allows exploring other classes
+  const targetClassId = (typeof req.query.classId === 'string' && req.query.classId !== 'all')
+    ? req.query.classId
+    : student.classId;
+
   const eligibleHomework = allHw.filter(h => {
     if (h.isDraft) return false; // Never show drafts to students
-    if (h.classId !== student.classId) return false; // STRICT CLASS ISOLATION
-    if (h.batchIds.includes('all')) return true;
-    return h.batchIds.includes(student.batchId);
+    if (targetClassId !== 'all' && h.classId !== targetClassId) return false;
+    return true;
   });
 
   // Attach student's submission status
   const enriched = eligibleHomework.map(hw => {
     const studentSub = submissions.find(s => s.homeworkId === hw.id && s.studentId === student.id);
+    const cls = classes.find(c => c.id === hw.classId);
     return {
       ...hw,
-      className: studentClass?.name || 'My Class',
+      className: cls?.name || studentClass?.name || 'My Class',
       mySubmission: studentSub || null,
       isSubmitted: !!studentSub,
       submissionStatus: studentSub?.status || 'pending'
@@ -180,10 +184,10 @@ router.get('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   });
 });
 
-// Teacher creates new daily homework
+// Teacher/Owner creates new daily homework
 router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can publish homework.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can publish homework.' });
   }
 
   const {
@@ -239,7 +243,7 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
       id: `notif_${Date.now()}`,
       recipientId: `class:${classId}`,
       title: `New Homework: ${newHw.subject} (${newHw.chapter})`,
-      message: `Er. Rajesh Sharma posted today's assignment for ${clsName}. Topic: ${newHw.topic || newHw.chapter}.`,
+      message: `Daily homework and teaching summary posted for ${clsName}. Topic: ${newHw.topic || newHw.chapter}.`,
       type: 'homework',
       read: false,
       createdAt: new Date().toISOString()
@@ -250,10 +254,10 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   return res.status(201).json({ message: 'Homework published successfully', homework: newHw });
 });
 
-// Teacher updates homework
+// Teacher/Owner updates homework
 router.put('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can edit homework.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can edit homework.' });
   }
 
   const { id } = req.params;
@@ -275,24 +279,34 @@ router.put('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   return res.json({ message: 'Homework updated', homework: updated });
 });
 
-// Teacher deletes homework
+// Teacher/Owner deletes homework
 router.delete('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can delete homework.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can delete homework.' });
   }
 
   const { id } = req.params;
   const allHw = db.get('homework');
+  const target = allHw.find(h => h.id === id);
+  if (!target) {
+    return res.status(404).json({ error: 'Homework record not found.' });
+  }
+
   const filtered = allHw.filter(h => h.id !== id);
   db.set('homework', filtered);
 
-  return res.json({ message: 'Homework deleted' });
+  // Clean up submissions for this homework
+  const submissions = db.get('submissions');
+  const filteredSubmissions = submissions.filter(s => s.homeworkId !== id);
+  db.set('submissions', filteredSubmissions);
+
+  return res.json({ message: 'Homework record deleted successfully.', id });
 });
 
-// Teacher duplicates homework to another class/batch
+// Teacher/Owner duplicates homework to another class/batch
 router.post('/:id/duplicate', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can duplicate homework.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can duplicate homework.' });
   }
 
   const { id } = req.params;
@@ -392,10 +406,10 @@ router.post('/:id/submit', requireAuth, (req: AuthenticatedRequest, res: Respons
   return res.json({ message: 'Homework submitted successfully!', submission: subObj });
 });
 
-// Teacher grades and reviews submission
+// Teacher/Owner grades and reviews submission
 router.post('/submissions/:subId/grade', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can grade submissions.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or owner can grade submissions.' });
   }
 
   const { subId } = req.params;

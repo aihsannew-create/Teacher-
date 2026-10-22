@@ -34,11 +34,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       const data = await apiFetch('/api/auth/me');
-      setUser(data.user);
-      setStudentProfile(data.studentProfile || null);
-      setMembership(data.membership || null);
-    } catch (err) {
-      console.error('Failed to restore session:', err);
+      if (data && data.user) {
+        setUser(data.user);
+        setStudentProfile(data.studentProfile || null);
+        setMembership(data.membership || null);
+      } else {
+        setStoredToken(null);
+        setUser(null);
+        setStudentProfile(null);
+        setMembership(null);
+      }
+    } catch {
+      // Stale or invalidated token - clear gracefully without noisy console traces
       setStoredToken(null);
       setUser(null);
       setStudentProfile(null);

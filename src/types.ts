@@ -208,6 +208,92 @@ export interface TeacherSettings {
   };
   razorpayKeyId?: string;
   landingContent?: LandingContent;
+  uiTexts?: AllUiTexts;
+}
+
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
+export interface AllUiTexts {
+  // A: Branding & Navigation
+  brandName: string;
+  brandTagline: string;
+  navHome: string;
+  navClasses: string;
+  navFaculty: string;
+  navLogin: string;
+  navStudentPortal: string;
+  navTeacherCabin: string;
+  navOwnerCabin: string;
+
+  // B: Hero Section
+  heroTitle: string;
+  heroTagline: string;
+  heroSubjects: string;
+  heroCtaStudentLogin: string;
+  heroCtaExploreClasses: string;
+  heroCtaTeacherCabin: string;
+
+  // C: Statistics / Metric Counters
+  stat1Value: string;
+  stat1Label: string;
+  stat2Value: string;
+  stat2Label: string;
+  stat3Value: string;
+  stat3Label: string;
+  stat4Value: string;
+  stat4Label: string;
+
+  // D: Hybrid Daily Homework Features (4 cards)
+  featuresSectionTitle: string;
+  featuresSectionSubtitle: string;
+  feature1Title: string;
+  feature1Desc: string;
+  feature2Title: string;
+  feature2Desc: string;
+  feature3Title: string;
+  feature3Desc: string;
+  feature4Title: string;
+  feature4Desc: string;
+
+  // E: Learning Journey & WhatsApp Enquiry
+  journeyTitle: string;
+  journeySubtitle: string;
+  journeyPoints: string[];
+  enquiryCardTitle: string;
+  enquiryCardSubtitle: string;
+  enquiryButtonText: string;
+
+  // F: Faculty / Teacher Profile
+  teacherName: string;
+  teacherTitle: string;
+  teacherBio: string;
+  teacherExperience: string;
+  classLevelsSummary: string;
+
+  // G: Contact & Footer
+  contactPhone: string;
+  contactEmail: string;
+  contactAddress: string;
+  footerCopyright: string;
+  footerNotice: string;
+
+  // H: Student Portal & Notices
+  studentWelcomeTitle: string;
+  studentWelcomeSubtitle: string;
+  homeworkGuidance: string;
+  feeExpiredWarning: string;
+  gracePeriodNote: string;
+
+  // I: Teacher Academic Cabin
+  teacherCabinTitle: string;
+  teacherCabinSubtitle: string;
+  publishHomeworkPrompt: string;
+
+  // J: Frequently Asked Questions (FAQs)
+  faqs: FaqItem[];
 }
 
 export interface LandingContent {

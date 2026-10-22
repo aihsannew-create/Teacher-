@@ -2,16 +2,32 @@ import { Router, Response } from 'express';
 import { db } from '../db';
 import { requireAuth, requireTeacher, AuthenticatedRequest } from '../auth';
 import { AppNotification } from '../types';
+import { defaultAllUiTexts } from '../uiTextDefaults';
 
 const router = Router();
 
-// Public Landing Page Content & Live Classes
+// Public Landing Page Content, All UI texts & Live Classes
 router.get('/public-content', (_req, res: Response) => {
   const settings = db.get('settings');
   const classes = db.get('classes');
   return res.json({
     landingContent: settings.landingContent,
+    uiTexts: {
+      ...defaultAllUiTexts,
+      ...(settings.uiTexts || {})
+    },
     classes
+  });
+});
+
+// Public All UI Texts endpoint
+router.get('/ui-texts', (_req, res: Response) => {
+  const settings = db.get('settings');
+  return res.json({
+    uiTexts: {
+      ...defaultAllUiTexts,
+      ...(settings.uiTexts || {})
+    }
   });
 });
 
