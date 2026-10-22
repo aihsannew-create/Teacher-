@@ -42,18 +42,27 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Cabin Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-blue-100/90">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                {uiTexts.teacherCabinTitle || 'Teacher Cabin & Control Center'}
-              </h1>
-              <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg">
-                Admin Panel
-              </span>
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md ring-2 ring-blue-500/20 border border-white shrink-0 bg-slate-900">
+              <img
+                src="/assets/teacher_photo.png"
+                alt={uiTexts.teacherName || 'Faculty'}
+                className="w-full h-full object-cover object-[center_18%]"
+              />
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {uiTexts.teacherName} · {uiTexts.teacherCabinSubtitle || 'Offline Batches & Digital Homework Oversight'}
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  {uiTexts.teacherCabinTitle || 'Teacher Cabin & Control Center'}
+                </h1>
+                <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-lg">
+                  Admin Panel
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {uiTexts.teacherName} · {uiTexts.teacherCabinSubtitle || 'Offline Batches & Digital Homework Oversight'}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

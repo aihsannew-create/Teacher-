@@ -14,6 +14,19 @@ export interface User {
   assignedSubjects?: string[];
 }
 
+export type InquiryStatus = 'new' | 'contacted' | 'demo_booked' | 'enrolled';
+
+export interface AdmissionInquiry {
+  id: string;
+  studentName: string;
+  phone: string;
+  classInterested: string;
+  subjects: string;
+  message?: string;
+  status: InquiryStatus;
+  createdAt: string;
+}
+
 export interface StudentProfile {
   id: string;
   userId: string;

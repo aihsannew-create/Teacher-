@@ -12,6 +12,7 @@ import attendanceRoutes from './server/routes/attendance';
 import reportsRoutes from './server/routes/reports';
 import settingsRoutes from './server/routes/settings';
 import ownerRoutes from './server/routes/owner';
+import inquiriesRoutes from './server/routes/inquiries';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,7 @@ async function startServer() {
   app.use('/api/attendance', attendanceRoutes);
   app.use('/api/reports', reportsRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/inquiries', inquiriesRoutes);
 
   // Health check
   app.get('/api/health', (_req, res) => {

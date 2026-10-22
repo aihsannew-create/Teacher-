@@ -263,6 +263,7 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
       };
       reader.readAsDataURL(file);
     });
+    e.target.value = '';
   };
 
   const handleRemoveAttachment = (attachmentId: string) => {

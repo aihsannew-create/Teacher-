@@ -17,7 +17,12 @@ import {
   Calendar,
   Image as ImageIcon,
   Maximize2,
-  Layers
+  Layers,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Trash2
 } from 'lucide-react';
 import { PaymentModal } from '../components/PaymentModal';
 
@@ -36,12 +41,18 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const [membershipExpired, setMembershipExpired] = useState(false);
   const [membershipWarning, setMembershipWarning] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
-  const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+  
+  // Gallery viewer with multi-image previous/next navigation
+  const [galleryViewer, setGalleryViewer] = useState<{
+    images: Array<{ url: string; title: string }>;
+    index: number;
+  } | null>(null);
 
   // Submit Modal
   const [activeHwForSubmit, setActiveHwForSubmit] = useState<Homework | null>(null);
   const [solutionText, setSolutionText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<{ name: string; fileType: 'pdf' | 'image'; fileUrl: string; size: string }[]>([]);
+  const [compressingFiles, setCompressingFiles] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
@@ -77,25 +88,85 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
+    setCompressingFiles(true);
+    const fileArray = Array.from(files);
+    let processed = 0;
+
+    fileArray.forEach(file => {
       const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-      const sizeStr = `${(file.size / 1024).toFixed(1)} KB`;
+      const reader = new FileReader();
 
       reader.onload = (loadEvent) => {
-        const fileUrl = loadEvent.target?.result as string;
-        setSelectedFiles(prev => [
-          ...prev,
-          {
-            name: file.name,
-            fileType: isPdf ? 'pdf' : 'image',
-            fileUrl,
-            size: sizeStr
+        const rawData = loadEvent.target?.result as string;
+
+        if (isPdf) {
+          const sizeStr = `${(file.size / 1024).toFixed(1)} KB`;
+          setSelectedFiles(prev => [
+            ...prev,
+            {
+              name: file.name,
+              fileType: 'pdf',
+              fileUrl: rawData,
+              size: sizeStr
+            }
+          ]);
+          processed += 1;
+          if (processed === fileArray.length) {
+            setCompressingFiles(false);
           }
-        ]);
+        } else {
+          // Compress image via canvas
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 1200;
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            const compressedUrl = canvas.toDataURL('image/jpeg', 0.85);
+            const sizeKb = Math.round((compressedUrl.length * 3 / 4) / 1024);
+
+            setSelectedFiles(prev => [
+              ...prev,
+              {
+                name: file.name,
+                fileType: 'image',
+                fileUrl: compressedUrl,
+                size: `${sizeKb} KB`
+              }
+            ]);
+
+            processed += 1;
+            if (processed === fileArray.length) {
+              setCompressingFiles(false);
+            }
+          };
+          img.onerror = () => {
+            processed += 1;
+            if (processed === fileArray.length) {
+              setCompressingFiles(false);
+            }
+          };
+          img.src = rawData;
+        }
       };
+
       reader.readAsDataURL(file);
     });
+
+    e.target.value = '';
   };
 
   const handleSubmitSolution = async (e: React.FormEvent) => {
@@ -379,32 +450,85 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
 
                       </div>
 
-                      {/* Image directly below Chapter, Class, and Subject */}
-                      <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 relative group">
-                        <img
-                          src={
-                            hw.attachments?.find(a => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))?.fileUrl ||
-                            'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80'
-                          }
-                          alt={hw.chapter}
-                          className="w-full max-h-[460px] object-cover sm:object-contain rounded-2xl cursor-pointer transition-transform group-hover:scale-[1.01]"
-                          onClick={() => setViewingImage({
-                            url: hw.attachments?.find(a => a.fileType === 'image')?.fileUrl || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80',
-                            title: hw.chapter
-                          })}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setViewingImage({
-                            url: hw.attachments?.find(a => a.fileType === 'image')?.fileUrl || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1000&auto=format&fit=crop&q=80',
-                            title: hw.chapter
-                          })}
-                          className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-md cursor-pointer"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5" />
-                          <span>Zoom Image</span>
-                        </button>
-                      </div>
+                      {/* Attached Images (Multi-Image Gallery or Single High-Res Preview) */}
+                      {(() => {
+                        const hwImages = (hw.attachments || []).filter(
+                          a => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i)
+                        );
+
+                        if (hwImages.length === 1) {
+                          return (
+                            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 relative group">
+                              <img
+                                src={hwImages[0].fileUrl}
+                                alt={hw.chapter}
+                                className="w-full max-h-[460px] object-cover sm:object-contain rounded-2xl cursor-pointer transition-transform group-hover:scale-[1.01]"
+                                onClick={() => setGalleryViewer({
+                                  images: hwImages.map(img => ({ url: img.fileUrl, title: `${hw.chapter} - ${img.name}` })),
+                                  index: 0
+                                })}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setGalleryViewer({
+                                  images: hwImages.map(img => ({ url: img.fileUrl, title: `${hw.chapter} - ${img.name}` })),
+                                  index: 0
+                                })}
+                                className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-md cursor-pointer"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                                <span>Zoom Image</span>
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        if (hwImages.length > 1) {
+                          return (
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between text-xs text-blue-900 font-bold bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-200/60">
+                                <span className="flex items-center gap-1.5">
+                                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>{hwImages.length} Blackboard Photos & Notes Pages</span>
+                                </span>
+                                <span className="text-[11px] text-blue-600 font-medium">Click any photo to zoom & browse</span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                                {hwImages.map((img, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => setGalleryViewer({
+                                      images: hwImages.map(item => ({ url: item.fileUrl, title: `${hw.chapter} - ${item.name}` })),
+                                      index: idx
+                                    })}
+                                    className="group relative rounded-2xl overflow-hidden border-2 border-slate-200 hover:border-blue-500 bg-slate-900 aspect-4/3 cursor-pointer shadow-2xs hover:shadow-md transition-all flex flex-col justify-end"
+                                  >
+                                    <img
+                                      src={img.fileUrl}
+                                      alt={img.name}
+                                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                    <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1">
+                                      <span>Page {idx + 1}</span>
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 z-10">
+                                      <Eye className="w-4 h-4" />
+                                      <span>View</span>
+                                    </div>
+                                    <div className="relative z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 text-[10px] text-white truncate flex items-center justify-between">
+                                      <span className="truncate max-w-[80%] font-medium">{img.name}</span>
+                                      {img.size && <span className="text-[9px] text-blue-200 shrink-0 font-mono">{img.size}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
 
                       {/* PDF Documents & Reference Links */}
                       {((hw.attachments && hw.attachments.some(a => a.fileType !== 'image' && !a.fileUrl?.startsWith('data:image') && !a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))) || (hw.referenceLinks && hw.referenceLinks.length > 0)) && (
@@ -572,27 +696,73 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                   </div>
                 </div>
 
+                {/* Selected Files & Notebook Images Preview */}
                 {selectedFiles.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    {selectedFiles.map((file, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-blue-100 text-xs shadow-2xs"
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>{selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} ready for submission:</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFiles([])}
+                        className="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
                       >
-                        <div className="flex items-center gap-2 truncate">
-                          <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span className="truncate font-medium text-slate-800">{file.name}</span>
-                          <span className="text-[10px] text-slate-400">({file.size})</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}
-                          className="text-slate-400 hover:text-red-500"
+                        Clear All
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {selectedFiles.map((file, i) => (
+                        <div
+                          key={i}
+                          className="group relative rounded-xl overflow-hidden border border-blue-200 bg-white aspect-4/3 flex flex-col justify-end shadow-2xs"
                         >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          {file.fileType === 'image' ? (
+                            <img
+                              src={file.fileUrl}
+                              alt={file.name}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-blue-50 flex flex-col items-center justify-center p-2 text-center">
+                              <FileText className="w-8 h-8 text-blue-600 mb-1" />
+                              <span className="text-[10px] font-bold text-blue-900 truncate max-w-full">{file.name}</span>
+                            </div>
+                          )}
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[9px] font-bold">
+                            #{i + 1}
+                          </div>
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                            {file.fileType === 'image' && (
+                              <button
+                                type="button"
+                                onClick={() => setGalleryViewer({
+                                  images: selectedFiles
+                                    .filter(f => f.fileType === 'image')
+                                    .map(f => ({ url: f.fileUrl, title: f.name })),
+                                  index: selectedFiles.filter(f => f.fileType === 'image').findIndex(f => f.name === file.name)
+                                })}
+                                className="p-1 rounded-md bg-black/60 hover:bg-black text-white"
+                                title="Zoom"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                              className="p-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white"
+                              title="Remove"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="relative z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-1.5 text-[10px] text-white truncate flex items-center justify-between">
+                            <span className="truncate max-w-[70%] font-medium">{file.name}</span>
+                            <span className="text-[9px] text-blue-200 shrink-0 font-mono">{file.size}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -607,11 +777,11 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-md shadow-blue-500/25 flex items-center gap-1.5"
+                  disabled={submitting || compressingFiles}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-md shadow-blue-500/25 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{submitting ? 'Submitting...' : 'Upload & Submit for Review'}</span>
+                  <span>{submitting ? 'Submitting...' : compressingFiles ? 'Compressing Photos...' : 'Upload & Submit for Review'}</span>
                 </button>
               </div>
             </form>
@@ -630,49 +800,109 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
         }}
       />
 
-      {/* ================= MODAL: FULL RESOLUTION IMAGE LIGHTBOX ================= */}
-      {viewingImage && (
+      {/* ================= MODAL: MULTI-IMAGE GALLERY LIGHTBOX ================= */}
+      {galleryViewer && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in"
-          onClick={() => setViewingImage(null)}
+          onClick={() => setGalleryViewer(null)}
         >
           <div
             className="relative max-w-4xl max-h-[92vh] w-full bg-slate-900 rounded-3xl p-3 sm:p-4 overflow-hidden border border-slate-700 shadow-2xl flex flex-col"
             onClick={e => e.stopPropagation()}
           >
+            {/* Header: Title, counter, close */}
             <div className="flex items-center justify-between pb-3 px-2 border-b border-slate-800 text-white">
-              <div className="flex items-center gap-2 truncate max-w-[85%]">
+              <div className="flex items-center gap-2 truncate max-w-[70%]">
                 <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
-                <span className="text-xs sm:text-sm font-bold truncate">{viewingImage.title}</span>
+                <span className="text-xs sm:text-sm font-bold truncate">
+                  {galleryViewer.images[galleryViewer.index]?.title || 'Homework Photo'}
+                </span>
               </div>
-              <button
-                onClick={() => setViewingImage(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Close Lightbox"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {galleryViewer.images.length > 1 && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800 text-[11px] font-bold">
+                    {galleryViewer.index + 1} / {galleryViewer.images.length}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setGalleryViewer(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="overflow-auto max-h-[78vh] flex items-center justify-center p-2 bg-black/40 rounded-2xl my-2">
+
+            {/* Main Image with Navigation Arrows */}
+            <div className="relative overflow-auto max-h-[75vh] flex items-center justify-center p-2 bg-black/40 rounded-2xl my-2">
               <img
-                src={viewingImage.url}
-                alt={viewingImage.title}
-                className="max-w-full max-h-[74vh] object-contain rounded-xl shadow-lg"
+                src={galleryViewer.images[galleryViewer.index]?.url}
+                alt="Homework Preview"
+                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-lg"
               />
+
+              {galleryViewer.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setGalleryViewer(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index - 1 + prev.images.length) % prev.images.length
+                            }
+                          : null
+                      );
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-blue-600 text-white backdrop-blur-md shadow-lg transition-all cursor-pointer"
+                    title="Previous Photo"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setGalleryViewer(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index + 1) % prev.images.length
+                            }
+                          : null
+                      );
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-blue-600 text-white backdrop-blur-md shadow-lg transition-all cursor-pointer"
+                    title="Next Photo"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
             </div>
-            <div className="flex items-center justify-between px-2 pt-2 text-[11px] text-slate-400">
-              <span>Full High-Resolution Blackboard / Notes Preview</span>
-              <a
-                href={viewingImage.url}
-                download={viewingImage.title}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
-              >
-                <Maximize2 className="w-3 h-3" />
-                <span>Open in Tab</span>
-              </a>
-            </div>
+
+            {/* Thumbnail Navigation Row if multiple images */}
+            {galleryViewer.images.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto py-1 px-1">
+                {galleryViewer.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setGalleryViewer(prev => (prev ? { ...prev, index: idx } : null))}
+                    className={`relative w-14 h-11 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                      idx === galleryViewer.index ? 'border-blue-500 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

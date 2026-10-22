@@ -13,7 +13,8 @@ import {
   PaymentReceipt,
   AppNotification,
   TeacherSettings,
-  AuditLog
+  AuditLog,
+  AdmissionInquiry
 } from './types';
 import { defaultAllUiTexts } from './uiTextDefaults';
 
@@ -31,6 +32,7 @@ export interface DatabaseSchema {
   notifications: AppNotification[];
   settings: TeacherSettings;
   auditLogs: AuditLog[];
+  inquiries: AdmissionInquiry[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -665,6 +667,49 @@ function getInitialSeed(): DatabaseSchema {
     }
   ];
 
+  const inquiries: AdmissionInquiry[] = [
+    {
+      id: 'inq_01',
+      studentName: 'Sameer Khan',
+      phone: '9822114455',
+      classInterested: 'Class 10 (Board Excellence)',
+      subjects: 'Mathematics & Science',
+      message: 'Looking for morning batch timings and fee details for 2026-27 board exams.',
+      status: 'contacted',
+      createdAt: '2026-10-21T11:30:00.000Z'
+    },
+    {
+      id: 'inq_02',
+      studentName: 'Ritika Sharma',
+      phone: '9822336677',
+      classInterested: 'Class 9 (Foundation Batch)',
+      subjects: 'Mathematics',
+      message: 'Needs help with NCERT exemplar problem solving and weekly test practice.',
+      status: 'demo_booked',
+      createdAt: '2026-10-22T09:15:00.000Z'
+    },
+    {
+      id: 'inq_03',
+      studentName: 'Aditya Gupta',
+      phone: '9822778899',
+      classInterested: 'Class 12 (PCM - Boards & Entrance)',
+      subjects: 'Physics & Mathematics',
+      message: 'Enquiry about calculus derivations and weekly test schedule.',
+      status: 'new',
+      createdAt: '2026-10-22T12:45:00.000Z'
+    },
+    {
+      id: 'inq_04',
+      studentName: 'Zoya Fatima',
+      phone: '9822445566',
+      classInterested: 'Class 8 (Pre-Foundation Batch)',
+      subjects: 'Science & Mathematics',
+      message: 'Interested in evening batch 4:00 PM to 5:15 PM.',
+      status: 'enrolled',
+      createdAt: '2026-10-20T16:20:00.000Z'
+    }
+  ];
+
   return {
     users: [ownerUser, teacherUser, studentUser1, studentUser2, studentUser3, studentUser4],
     students,
@@ -678,7 +723,8 @@ function getInitialSeed(): DatabaseSchema {
     receipts,
     notifications,
     settings: defaultSettings,
-    auditLogs
+    auditLogs,
+    inquiries
   };
 }
 
@@ -760,6 +806,12 @@ class Store {
             updated = true;
           }
         });
+
+        // Ensure inquiries collection exists
+        if (!parsed.inquiries || !Array.isArray(parsed.inquiries)) {
+          parsed.inquiries = getInitialSeed().inquiries;
+          updated = true;
+        }
 
         if (updated) {
           this.save(parsed);

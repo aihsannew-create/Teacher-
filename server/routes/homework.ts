@@ -290,21 +290,22 @@ router.delete('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) =>
   }
 
   const { id } = req.params;
+  const decodedId = decodeURIComponent(id).trim();
   const allHw = db.get('homework');
-  const target = allHw.find(h => h.id === id);
+  const target = allHw.find(h => h.id === id || h.id === decodedId);
   if (!target) {
     return res.status(404).json({ error: 'Homework record not found.' });
   }
 
-  const filtered = allHw.filter(h => h.id !== id);
+  const filtered = allHw.filter(h => h.id !== id && h.id !== decodedId);
   db.set('homework', filtered);
 
   // Clean up submissions for this homework
   const submissions = db.get('submissions');
-  const filteredSubmissions = submissions.filter(s => s.homeworkId !== id);
+  const filteredSubmissions = submissions.filter(s => s.homeworkId !== id && s.homeworkId !== decodedId);
   db.set('submissions', filteredSubmissions);
 
-  return res.json({ message: 'Homework record deleted successfully.', id });
+  return res.json({ success: true, message: 'Homework record deleted successfully.', id: target.id });
 });
 
 // Teacher/Owner duplicates homework to another class/batch
@@ -455,30 +456,6 @@ router.post('/submissions/:subId/grade', requireAuth, (req: AuthenticatedRequest
   return res.json({ message: 'Submission graded successfully', submission: submissions[index] });
 });
 
-// Teacher/Owner deletes entire homework
-router.delete('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const userRole = req.user?.role;
-  if (userRole !== 'teacher' && userRole !== 'owner') {
-    return res.status(403).json({ error: 'Only teacher or owner can delete homework.' });
-  }
-
-  const { id } = req.params;
-  const decodedId = decodeURIComponent(id).trim();
-  const allHw = db.get('homework');
-  const index = allHw.findIndex(h => h.id === decodedId || h.id === id);
-
-  if (index !== -1) {
-    allHw.splice(index, 1);
-    db.set('homework', allHw);
-
-    // Clean up associated submissions
-    const submissions = db.get('submissions');
-    const filteredSubs = submissions.filter(s => s.homeworkId !== decodedId && s.homeworkId !== id);
-    db.set('submissions', filteredSubs);
-  }
-
-  return res.json({ success: true, message: 'Homework deleted successfully.' });
-});
 
 // Teacher/Owner removes image from homework
 router.delete('/:id/image', requireAuth, (req: AuthenticatedRequest, res: Response) => {

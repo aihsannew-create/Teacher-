@@ -15,11 +15,25 @@ import {
   X,
   Trash2,
   FileText,
-  Target
+  Target,
+  Image as ImageIcon,
+  Upload,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Check
 } from 'lucide-react';
 
 interface HomeworkGatePageProps {
   onNavigate: (view: string, extra?: any) => void;
+}
+
+interface UploadedImageItem {
+  id: string;
+  name: string;
+  fileUrl: string;
+  size: string;
 }
 
 export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }) => {
@@ -43,19 +57,26 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [classes, setClasses] = useState<ClassLevel[]>([]);
   const [fetchingHw, setFetchingHw] = useState(false);
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
+
+  // Gallery Lightbox Modal (Supports single or multiple images navigation)
+  const [galleryViewer, setGalleryViewer] = useState<{
+    images: Array<{ url: string; title: string }>;
+    index: number;
+  } | null>(null);
 
   // Class category selection ("Homework me class ko category me divide kro")
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
 
-  // Teacher Upload Modal (Only for Teachers)
+  // Teacher Upload Modal (Only for Teachers) - Multi-Image Support
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newHwClass, setNewHwClass] = useState('cls_10');
   const [newHwSubject, setNewHwSubject] = useState('Mathematics');
   const [newHwChapter, setNewHwChapter] = useState('');
   const [newHwForWhom, setNewHwForWhom] = useState('All Students');
   const [newHwText, setNewHwText] = useState('');
-  const [newHwImageUrl, setNewHwImageUrl] = useState('');
+  const [newHwImages, setNewHwImages] = useState<UploadedImageItem[]>([]);
+  const [manualImageUrl, setManualImageUrl] = useState('');
+  const [compressingImages, setCompressingImages] = useState(false);
   const [uploadingHw, setUploadingHw] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -152,11 +173,99 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
     return `${String(mins).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const getHomeworkImage = (hw: Homework) => {
-    const imgAtt = hw.attachments?.find(
-      (a) => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp)$/i)
-    );
-    return imgAtt?.fileUrl || null;
+  // Extract all attached images for a given homework assignment
+  const getHomeworkImages = (hw: Homework): Array<{ name: string; fileUrl: string; size?: string }> => {
+    return (hw.attachments || [])
+      .filter((a) => a.fileType === 'image' || a.fileUrl?.startsWith('data:image') || a.name?.match(/\.(jpeg|jpg|png|webp|gif)$/i))
+      .map((a, i) => ({
+        name: a.name || `Photo ${i + 1}`,
+        fileUrl: a.fileUrl,
+        size: a.size
+      }));
+  };
+
+  // Multiple image upload handler with client-side canvas compression
+  const handleMultipleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setCompressingImages(true);
+    const fileArray = Array.from(files);
+    let processed = 0;
+
+    fileArray.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const rawData = loadEvent.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const sizeKb = Math.round((compressedUrl.length * 3 / 4) / 1024);
+
+          setNewHwImages((prev) => [
+            ...prev,
+            {
+              id: `att_img_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+              name: file.name || `Board_Photo_${prev.length + 1}.jpg`,
+              fileUrl: compressedUrl,
+              size: `${sizeKb} KB`
+            }
+          ]);
+
+          processed += 1;
+          if (processed === fileArray.length) {
+            setCompressingImages(false);
+          }
+        };
+        img.onerror = () => {
+          processed += 1;
+          if (processed === fileArray.length) {
+            setCompressingImages(false);
+          }
+        };
+        img.src = rawData;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input value so same files can be chosen again if needed
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (imgId: string) => {
+    setNewHwImages((prev) => prev.filter((img) => img.id !== imgId));
+  };
+
+  const handleAddManualImageUrl = () => {
+    const url = manualImageUrl.trim();
+    if (!url) return;
+    setNewHwImages((prev) => [
+      ...prev,
+      {
+        id: `att_url_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: `Photo_${prev.length + 1}.jpg`,
+        fileUrl: url,
+        size: 'Link'
+      }
+    ]);
+    setManualImageUrl('');
   };
 
   // Delete ENTIRE Homework (Teacher / Owner) - NO window.confirm popup (works 100% in iframes)
@@ -186,9 +295,13 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
     setUploadingHw(true);
     try {
       const selectedClassObj = classes.find((c) => c.id === newHwClass);
-      const attachments = newHwImageUrl.trim()
-        ? [{ id: 'att_' + Date.now(), name: 'Homework_Photo.jpg', fileType: 'image' as const, fileUrl: newHwImageUrl.trim(), size: '450 KB' }]
-        : [];
+      const attachments = newHwImages.map((img, i) => ({
+        id: img.id || `att_${Date.now()}_${i}`,
+        name: img.name,
+        fileType: 'image' as const,
+        fileUrl: img.fileUrl,
+        size: img.size
+      }));
 
       const hwText = newHwText.trim() || 'Practice given questions and complete fair notebook exercises.';
       const forWhom = newHwForWhom.trim() || 'All Students';
@@ -213,7 +326,8 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
       setNewHwChapter('');
       setNewHwForWhom('All Students');
       setNewHwText('');
-      setNewHwImageUrl('');
+      setNewHwImages([]);
+      setManualImageUrl('');
       await loadHomework();
     } catch (err: any) {
       alert(err.message || 'Failed to publish homework');
@@ -498,7 +612,7 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
         ) : (
           <div className="space-y-6">
             {filteredHomeworkList.map((hw) => {
-              const imageUrl = getHomeworkImage(hw);
+              const hwImages = getHomeworkImages(hw);
 
               return (
                 <div
@@ -585,23 +699,73 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
                     </p>
                   </div>
 
-                  {/* Homework Image (Directly below text, with Zoom option) */}
-                  {imageUrl && (
-                    <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 relative group">
-                      <img
-                        src={imageUrl}
-                        alt={hw.chapter}
-                        className="w-full max-h-[480px] object-cover sm:object-contain bg-slate-950 rounded-2xl cursor-pointer transition-transform group-hover:scale-[1.01]"
-                        onClick={() => setViewingImage(imageUrl)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setViewingImage(imageUrl)}
-                        className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-md cursor-pointer"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                        <span>Zoom Image</span>
-                      </button>
+                  {/* Homework Images (Multi-Image Gallery with Zoom & Browse) */}
+                  {hwImages.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      {hwImages.length === 1 ? (
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-900/5 relative group">
+                          <img
+                            src={hwImages[0].fileUrl}
+                            alt={hwImages[0].name}
+                            className="w-full max-h-[480px] object-cover sm:object-contain bg-slate-950 rounded-2xl cursor-pointer transition-transform group-hover:scale-[1.01]"
+                            onClick={() => setGalleryViewer({
+                              images: hwImages.map((img) => ({ url: img.fileUrl, title: `${hw.chapter} - ${img.name}` })),
+                              index: 0
+                            })}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setGalleryViewer({
+                              images: hwImages.map((img) => ({ url: img.fileUrl, title: `${hw.chapter} - ${img.name}` })),
+                              index: 0
+                            })}
+                            className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-md cursor-pointer"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            <span>Zoom Image</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between text-xs text-blue-900 font-bold bg-blue-50/80 px-3 py-1.5 rounded-xl border border-blue-200/60">
+                            <span className="flex items-center gap-1.5">
+                              <Camera className="w-3.5 h-3.5 text-blue-600" />
+                              <span>{hwImages.length} Images / Pages Attached</span>
+                            </span>
+                            <span className="text-[11px] text-blue-600 font-medium">Click any photo to zoom & browse</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                            {hwImages.map((img, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => setGalleryViewer({
+                                  images: hwImages.map((item) => ({ url: item.fileUrl, title: `${hw.chapter} - ${item.name}` })),
+                                  index: idx
+                                })}
+                                className="group relative rounded-2xl overflow-hidden border-2 border-slate-200 hover:border-blue-500 bg-slate-900 aspect-4/3 cursor-pointer shadow-2xs hover:shadow-md transition-all flex flex-col justify-end"
+                              >
+                                <img
+                                  src={img.fileUrl}
+                                  alt={img.name}
+                                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 text-white text-[10px] font-black backdrop-blur-xs flex items-center gap-1">
+                                  <span>Page {idx + 1}</span>
+                                </div>
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 z-10">
+                                  <Eye className="w-4 h-4" />
+                                  <span>View</span>
+                                </div>
+                                <div className="relative z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 text-[10px] text-white truncate flex items-center justify-between">
+                                  <span className="truncate max-w-[80%] font-medium">{img.name}</span>
+                                  {img.size && <span className="text-[9px] text-blue-200 shrink-0 font-mono">{img.size}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -698,48 +862,113 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
                 />
               </div>
 
-              {/* Homework Photo / Image (Optional) */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Homework Photo / Image URL (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={newHwImageUrl}
-                  onChange={(e) => setNewHwImageUrl(e.target.value)}
-                  placeholder="Paste image link or select photo from device below"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none"
-                />
-                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    id="hw-photo-file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => setNewHwImageUrl(reader.result as string);
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  <label
-                    htmlFor="hw-photo-file"
-                    className="text-blue-600 hover:underline cursor-pointer font-bold"
-                  >
-                    Select photo from device
+              {/* Multiple Images Upload Section */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/60 border border-blue-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                      <span>Upload Photos / Notes (Multiple Images Support)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Ek saath multiple blackboard photos, notebook pages ya worksheets select karein
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-xs transition-all cursor-pointer whitespace-nowrap self-start sm:self-auto">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{compressingImages ? 'Compressing...' : '+ Select Photos'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={compressingImages}
+                      onChange={handleMultipleImageUpload}
+                      className="hidden"
+                    />
                   </label>
-                  {newHwImageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setNewHwImageUrl('')}
-                      className="ml-auto text-rose-500 hover:text-rose-700 text-[11px] font-semibold cursor-pointer"
-                    >
-                      Remove Photo
-                    </button>
-                  )}
                 </div>
+
+                {/* Optional Image URL Input */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={manualImageUrl}
+                    onChange={(e) => setManualImageUrl(e.target.value)}
+                    placeholder="Or paste an image web link..."
+                    className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddManualImageUrl}
+                    disabled={!manualImageUrl.trim()}
+                    className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    + Add Link
+                  </button>
+                </div>
+
+                {/* Uploaded Photos Preview List */}
+                {newHwImages.length > 0 && (
+                  <div className="space-y-2 pt-1 border-t border-blue-200/60">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-blue-900 flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span>{newHwImages.length} image{newHwImages.length > 1 ? 's' : ''} ready to attach</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setNewHwImages([])}
+                        className="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {newHwImages.map((img, idx) => (
+                        <div
+                          key={img.id || idx}
+                          className="group relative rounded-xl overflow-hidden border border-blue-200 bg-white aspect-4/3 flex flex-col justify-end shadow-2xs"
+                        >
+                          <img
+                            src={img.fileUrl}
+                            alt={img.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[9px] font-bold">
+                            #{idx + 1}
+                          </div>
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setGalleryViewer({
+                                images: newHwImages.map(item => ({ url: item.fileUrl, title: item.name })),
+                                index: idx
+                              })}
+                              className="p-1 rounded-md bg-black/60 hover:bg-black text-white"
+                              title="Preview"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(img.id)}
+                              className="p-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="relative z-10 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-1.5 text-[10px] text-white truncate flex items-center justify-between">
+                            <span className="truncate max-w-[70%] font-medium">{img.name}</span>
+                            <span className="text-[9px] text-blue-200 shrink-0 font-mono">{img.size}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -763,21 +992,109 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
         </div>
       )}
 
-      {/* Full-Screen Image Zoom Modal */}
-      {viewingImage && (
+      {/* Gallery Lightbox Modal (Supports single or multi-image carousel browsing) */}
+      {galleryViewer && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm cursor-zoom-out"
-          onClick={() => setViewingImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in"
+          onClick={() => setGalleryViewer(null)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setViewingImage(null)}
-              className="absolute top-3 right-3 p-2 rounded-full bg-black/75 hover:bg-black text-white cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <img src={viewingImage} alt="Zoomed Homework" className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
+          <div
+            className="relative max-w-4xl max-h-[92vh] w-full bg-slate-900 rounded-3xl p-3 sm:p-4 overflow-hidden border border-slate-700 shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header: Title, counter, close */}
+            <div className="flex items-center justify-between pb-3 px-2 border-b border-slate-800 text-white">
+              <div className="flex items-center gap-2 truncate max-w-[70%]">
+                <ImageIcon className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold truncate">
+                  {galleryViewer.images[galleryViewer.index]?.title || 'Homework Photo'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {galleryViewer.images.length > 1 && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800 text-[11px] font-bold">
+                    {galleryViewer.index + 1} / {galleryViewer.images.length}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setGalleryViewer(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Image with Navigation Arrows */}
+            <div className="relative overflow-auto max-h-[75vh] flex items-center justify-center p-2 bg-black/40 rounded-2xl my-2">
+              <img
+                src={galleryViewer.images[galleryViewer.index]?.url}
+                alt="Homework Preview"
+                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-lg"
+              />
+
+              {galleryViewer.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGalleryViewer((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index - 1 + prev.images.length) % prev.images.length
+                            }
+                          : null
+                      );
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-blue-600 text-white backdrop-blur-md shadow-lg transition-all cursor-pointer"
+                    title="Previous Photo"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setGalleryViewer((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              index: (prev.index + 1) % prev.images.length
+                            }
+                          : null
+                      );
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/70 hover:bg-blue-600 text-white backdrop-blur-md shadow-lg transition-all cursor-pointer"
+                    title="Next Photo"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Thumbnail Row if multiple images */}
+            {galleryViewer.images.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto py-1 px-1">
+                {galleryViewer.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setGalleryViewer((prev) => (prev ? { ...prev, index: idx } : null))}
+                    className={`relative w-14 h-11 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                      idx === galleryViewer.index ? 'border-blue-500 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, useScroll } from 'motion/react';
 import { useUiText } from '../context/UiTextContext';
+import { apiFetch } from '../api';
 import { 
   GraduationCap, 
   CheckCircle2, 
@@ -13,7 +14,14 @@ import {
   X, 
   MessageCircle,
   Clock,
-  Sparkles
+  Sparkles,
+  Send,
+  Check,
+  PhoneCall,
+  Plus,
+  HelpCircle,
+  Calendar,
+  User
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -29,6 +37,50 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const cleanPhone = phoneRaw.replace(/\D/g, '');
   const teacherTitle = uiTexts.heroTitle || 'AIHSAN ANSARI';
   const whatsappUrl = `https://wa.me/91${cleanPhone}?text=Hello%20${encodeURIComponent(teacherTitle)},%20I%20want%20information%20about%20offline%20tuition%20classes.`;
+
+  // Inquiry Form State
+  const [inqName, setInqName] = useState('');
+  const [inqPhone, setInqPhone] = useState('');
+  const [inqClass, setInqClass] = useState('Class 10');
+  const [inqSubjects, setInqSubjects] = useState('Mathematics & Science');
+  const [inqMessage, setInqMessage] = useState('');
+  const [submittingInq, setSubmittingInq] = useState(false);
+  const [inqSuccessMsg, setInqSuccessMsg] = useState<string | null>(null);
+  const [inqErrorMsg, setInqErrorMsg] = useState<string | null>(null);
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inqName.trim() || !inqPhone.trim()) {
+      setInqErrorMsg('Kripya apna naam aur phone number darj karein.');
+      return;
+    }
+
+    setSubmittingInq(true);
+    setInqErrorMsg(null);
+    setInqSuccessMsg(null);
+
+    try {
+      await apiFetch('/api/inquiries', {
+        method: 'POST',
+        body: JSON.stringify({
+          studentName: inqName.trim(),
+          phone: inqPhone.trim(),
+          classInterested: inqClass,
+          subjects: inqSubjects,
+          message: inqMessage.trim()
+        })
+      });
+
+      setInqSuccessMsg('Dhanyawad! Aapki inquiry darj kar li gayi hai. Teacher jald hi aapse sampark karenge.');
+      setInqName('');
+      setInqPhone('');
+      setInqMessage('');
+    } catch (err: any) {
+      setInqErrorMsg(err.message || 'Inquiry submit karne me asuvidha hui. Kripya punah prayas karein.');
+    } finally {
+      setSubmittingInq(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white relative">
@@ -111,7 +163,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               </motion.div>
             </div>
 
-            {/* Right Column: Clean Snapshot Card */}
+            {/* Right Column: Admission Inquiry Desk (In place of Coaching Overview) */}
             <motion.div
               initial={{ opacity: 0, scale: 0.97, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
@@ -119,66 +171,152 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               transition={{ duration: 0.35, delay: 0.08 }}
               className="lg:col-span-5"
             >
-              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-900">Coaching Overview</h3>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Admissions Open
+              <div className="p-6 rounded-3xl bg-white border-2 border-blue-200/80 shadow-xl shadow-blue-500/5 space-y-4 relative overflow-hidden">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                      <Send className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-950">Admission Inquiry Desk</h3>
+                      <p className="text-[11px] text-slate-500">Pravesh Puchtach & Batch Booking</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                    ● Admissions Open
                   </span>
                 </div>
 
-                <div className="space-y-3 text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                      <GraduationCap className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-slate-500 font-medium">Target Classes</div>
-                      <div className="font-bold text-slate-900">Class 6, 7, 8, 9, 10, 11, 12</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-slate-500 font-medium">Subjects Offered</div>
-                      <div className="font-bold text-slate-900">{uiTexts.heroSubjects || 'Mathematics, Science, English, Hindi'}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-slate-500 font-medium">Batch System</div>
-                      <div className="font-bold text-slate-900">Small batches (Max 25 students)</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                      <Phone className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-slate-500 font-medium">Direct Contact</div>
-                      <div className="font-bold text-slate-900">+91 {phoneRaw}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-200">
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2.5 px-4 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors flex items-center justify-center gap-2"
+                {/* Success Banner */}
+                {inqSuccessMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Send Message on WhatsApp</span>
-                  </a>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-bold">Inquiry Successfully Registered!</div>
+                      <div className="text-[11px] text-emerald-700 mt-0.5">{inqSuccessMsg}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInqSuccessMsg(null)}
+                      className="text-emerald-700 hover:text-emerald-900"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Error Banner */}
+                {inqErrorMsg && (
+                  <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                    <X className="w-4 h-4 shrink-0" />
+                    <span>{inqErrorMsg}</span>
+                  </div>
+                )}
+
+                {/* Quick Inquiry Form */}
+                <form onSubmit={handleInquirySubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Student / Parent Name *
+                    </label>
+                    <div className="relative">
+                      <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={inqName}
+                        onChange={e => setInqName(e.target.value)}
+                        placeholder="e.g. Rahul Sharma / S.K. Sharma"
+                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Phone / WhatsApp *
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="tel"
+                          required
+                          value={inqPhone}
+                          onChange={e => setInqPhone(e.target.value)}
+                          placeholder="e.g. 9876543210"
+                          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Target Class *
+                      </label>
+                      <select
+                        value={inqClass}
+                        onChange={e => setInqClass(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 font-semibold"
+                      >
+                        <option value="Class 10">Class 10 (Board Batch)</option>
+                        <option value="Class 9">Class 9 (Foundation)</option>
+                        <option value="Class 8">Class 8 (Pre-Foundation)</option>
+                        <option value="Class 11">Class 11 (Science / PCM)</option>
+                        <option value="Class 12">Class 12 (Board & Entrance)</option>
+                        <option value="Class 6-7">Class 6 & 7 (Junior)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Preferred Subject / Inquiry Message
+                    </label>
+                    <input
+                      type="text"
+                      value={inqMessage}
+                      onChange={e => setInqMessage(e.target.value)}
+                      placeholder="e.g. Mathematics, batch timings & fee details"
+                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="pt-1 flex flex-col sm:flex-row items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={submittingInq}
+                      className="w-full sm:flex-1 py-2.5 px-4 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{submittingInq ? 'Submitting...' : 'Submit Inquiry'}</span>
+                    </button>
+
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto py-2.5 px-3.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      title="Chat directly on WhatsApp"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                </form>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Free demo class on enrollment</span>
+                  </span>
+                  <span className="font-semibold text-slate-600">
+                    Offline Classroom Batch
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -443,8 +581,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             transition={{ duration: 0.35 }}
             className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center gap-6"
           >
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-3xl shadow-md shrink-0">
-              {teacherTitle.substring(0, 2).toUpperCase()}
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden shadow-lg ring-4 ring-blue-500/20 border-2 border-white shrink-0 bg-slate-900 group">
+              <img
+                src="/assets/teacher_photo.png"
+                alt={teacherTitle}
+                className="w-full h-full object-cover object-[center_18%] group-hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/assets/aistudio/Screenshot_20260828-105016_Instagram_b94f6325.png';
+                }}
+              />
             </div>
 
             <div className="space-y-2 text-center sm:text-left">
