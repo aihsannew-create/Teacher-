@@ -642,6 +642,15 @@
   ],
   "notifications": [
     {
+      "id": "notif_1792947343072",
+      "recipientId": "teacher",
+      "title": "New Admission Inquiry: Test User",
+      "message": "Test User inquired for Class 10 (Maths). Phone: 9905847357. Message: \"Test message\"",
+      "type": "announcement",
+      "read": false,
+      "createdAt": "2026-10-25T16:55:43.072Z"
+    },
+    {
       "id": "notif_1792691986168",
       "recipientId": "class:cls_10",
       "title": "New Homework: Mathematics (Test Topic Deletion)",
@@ -837,6 +846,16 @@
     }
   ],
   "inquiries": [
+    {
+      "id": "inq_1792947343071_uccu",
+      "studentName": "Test User",
+      "phone": "9905847357",
+      "classInterested": "Class 10",
+      "subjects": "Maths",
+      "message": "Test message",
+      "status": "new",
+      "createdAt": "2026-10-25T16:55:43.071Z"
+    },
     {
       "id": "inq_01",
       "studentName": "Sameer Khan",

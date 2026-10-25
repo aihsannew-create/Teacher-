@@ -6,6 +6,8 @@ import { Homework, PaymentReceipt } from '../types';
 import { BookOpen, CalendarCheck, CreditCard, AlertTriangle, CheckCircle2, Clock, ChevronRight, ShieldAlert } from 'lucide-react';
 import { PaymentModal } from '../components/PaymentModal';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { AccessCountdownTimer } from '../components/AccessCountdownTimer';
+import { SubmitPaymentProofModal } from '../components/SubmitPaymentProofModal';
 
 interface StudentDashboardProps {
   onNavigate: (view: string) => void;
@@ -19,6 +21,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
   const [membershipExpired, setMembershipExpired] = useState(false);
   const [membershipWarning, setMembershipWarning] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<any>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,10 +38,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
           }
           setMembershipExpired(false);
         } catch (err: any) {
-          if (err.status === 403 && err.data?.error === 'membership_expired') {
+          if (err.status === 403 && (err.data?.error === 'membership_expired' || err.data?.locked)) {
             setMembershipExpired(true);
           }
         }
+
+        try {
+          const statusRes = await apiFetch('/api/payments/my-status');
+          if (statusRes?.pendingRequest) {
+            setPendingPayment(statusRes.pendingRequest);
+          } else {
+            setPendingPayment(null);
+          }
+          if (statusRes?.isExpired) {
+            setMembershipExpired(true);
+          }
+        } catch {}
 
         try {
           const attData = await apiFetch('/api/attendance');
@@ -100,63 +116,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
           </div>
         )}
 
-        {/* Membership Warning or Expired Notice */}
-        {membershipExpired ? (
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-red-50/95 to-orange-50/90 backdrop-blur-xl border border-red-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="w-6 h-6 text-red-600 shrink-0 mt-1" />
+        {/* Pending Verification Notice if student submitted payment ID */}
+        {pendingPayment && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-spin" />
               <div>
-                <h3 className="text-sm font-bold text-red-950">
-                  Monthly Tuition Membership Expired
-                </h3>
-                <p className="text-xs text-red-800/90 mt-1 max-w-xl">
-                  {uiTexts.feeExpiredWarning || 'Daily homework, teaching summaries, and submission privileges are paused until your monthly coaching fee is cleared. Please renew online to resume immediate access.'}
+                <span className="font-bold text-amber-950">Payment Verification Pending (Admin Review)</span>
+                <p className="text-slate-600 mt-0.5">
+                  Aapne Payment ID / UTR <strong className="font-mono text-blue-700 font-bold">{pendingPayment.utrNumber || pendingPayment.id}</strong> (₹{pendingPayment.amount}) submit kiya hai. Admin approve karte hi 30 din ka timer chalu ho jayega.
                 </p>
               </div>
             </div>
             <button
-              onClick={() => setShowPayModal(true)}
-              className="px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-all shadow-md shadow-red-500/25 shrink-0"
+              onClick={() => setShowProofModal(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold shrink-0 transition-colors cursor-pointer"
             >
-              Renew Membership (₹{studentProfile?.monthlyFee || 2500})
+              Update / Submit Again
             </button>
-          </div>
-        ) : membershipWarning ? (
-          <div className="p-4 rounded-2xl bg-amber-50/90 backdrop-blur-md border border-amber-200 flex items-center justify-between gap-4 text-xs shadow-xs">
-            <div className="flex items-center gap-2 text-amber-900">
-              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-              <span className="font-medium">{membershipWarning}</span>
-            </div>
-            <button
-              onClick={() => setShowPayModal(true)}
-              className="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-500 shadow-xs"
-            >
-              Pay Tuition Fee
-            </button>
-          </div>
-        ) : (
-          <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xl border border-blue-100 shadow-[0_4px_20px_rgba(37,99,235,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center font-extrabold shadow-xs">
-                ✓
-              </div>
-              <div>
-                <div className="font-bold text-slate-900">Active Tuition Membership</div>
-                <div className="text-slate-500">
-                  Access valid until: <span className="font-mono text-emerald-700 font-bold">{membership?.expiryDate || 'Active'}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onNavigate('student-payments')}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200/90 rounded-lg hover:bg-slate-50 shadow-xs"
-              >
-                Payment History & Receipts
-              </button>
-            </div>
           </div>
         )}
+
+        {/* Live 30-Day Access Countdown Timer Panel */}
+        <AccessCountdownTimer
+          expiryDate={membership?.expiryDate}
+          startDate={membership?.startDate}
+          onExpire={() => setMembershipExpired(true)}
+          onOpenPaymentModal={() => setShowProofModal(true)}
+        />
 
         {/* KPI Strip in Frosted White Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -311,6 +298,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
       <ReceiptModal
         receipt={selectedReceipt}
         onClose={() => setSelectedReceipt(null)}
+      />
+
+      {/* Submit Payment Proof Modal */}
+      <SubmitPaymentProofModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        onSuccess={() => {
+          setShowProofModal(false);
+          refreshProfile();
+        }}
       />
     </div>
   );

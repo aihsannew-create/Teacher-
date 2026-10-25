@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
 import { PaymentTransaction, PaymentReceipt } from '../types';
-import { CreditCard, Receipt, Printer, AlertCircle } from 'lucide-react';
+import { CreditCard, Receipt, Printer, AlertCircle, Clock, ShieldCheck, QrCode } from 'lucide-react';
 import { PaymentModal } from '../components/PaymentModal';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { AccessCountdownTimer } from '../components/AccessCountdownTimer';
+import { SubmitPaymentProofModal } from '../components/SubmitPaymentProofModal';
 
 export const StudentPayments: React.FC = () => {
   const { studentProfile, membership, refreshProfile } = useAuth();
@@ -12,14 +14,24 @@ export const StudentPayments: React.FC = () => {
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<any>(null);
   const [activeReceipt, setActiveReceipt] = useState<PaymentReceipt | null>(null);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch('/api/payments/history');
+      const [data, statusRes] = await Promise.all([
+        apiFetch('/api/payments/history'),
+        apiFetch('/api/payments/my-status').catch(() => null)
+      ]);
       setPayments(data.payments || []);
       setReceipts(data.receipts || []);
+      if (statusRes?.pendingRequest) {
+        setPendingPayment(statusRes.pendingRequest);
+      } else {
+        setPendingPayment(null);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,56 +54,57 @@ export const StudentPayments: React.FC = () => {
             Tuition Membership & Fee Ledger
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Official payment history, automated membership renewal, and computer-verified receipts
+            Official payment history, 30-day access validity tracking, and computer-verified receipts
           </p>
         </div>
 
-        {/* Current Membership Status in Frosted Glass Card */}
-        <div className={`p-6 rounded-3xl border shadow-[0_10px_30px_rgba(37,99,235,0.05)] backdrop-blur-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 ${
-          isExpired
-            ? 'bg-red-50/90 border-red-200'
-            : 'bg-gradient-to-r from-blue-50/95 via-white/95 to-indigo-50/80 border-blue-200/90'
-        }`}>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className={`px-2.5 py-0.5 text-xs font-bold uppercase rounded-lg tracking-wider ${
-                isExpired
-                  ? 'bg-red-100 text-red-700 border border-red-200'
-                  : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-              }`}>
-                {isExpired ? 'Overdue / Expired' : 'Active Membership'}
-              </span>
-              <span className="text-xs text-slate-500 font-medium">Class: {studentProfile?.className}</span>
+        {/* Pending Verification Notice */}
+        {pendingPayment && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-spin" />
+              <div>
+                <span className="font-bold text-amber-950">Payment ID Verification Pending</span>
+                <p className="text-slate-600 mt-0.5">
+                  Aapka Payment ID / UTR <strong className="font-mono text-blue-700 font-bold">{pendingPayment.utrNumber || pendingPayment.id}</strong> (₹{pendingPayment.amount}) Admin (AIHSAN ANSARI) ke paas verify hone ke liye pending hai. Approve hote hi 30 din ka access chalu ho jayega.
+                </p>
+              </div>
             </div>
-
-            <h3 className="text-xl font-extrabold text-slate-900">
-              {isExpired ? 'Tuition Fee Due for Renewal' : 'All Dues Cleared & Coaching Active'}
-            </h3>
-
-            <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-              {isExpired
-                ? 'Your monthly coaching membership expired. Pay online via UPI or Cards to instantly resume homework downloads, lecture summaries, and test submissions.'
-                : `Your monthly coaching membership is active until ${membership?.expiryDate}. Next scheduled renewal is on ${membership?.expiryDate}.`
-              }
-            </p>
-
-            <div className="pt-1 flex items-center gap-4 text-xs font-mono">
-              <span className="text-slate-500 font-medium">Monthly Tuition: <strong className="text-blue-700">₹{feeAmount.toLocaleString('en-IN')}</strong></span>
-              <span className="text-slate-500 font-medium">Roll: <strong className="text-slate-900">{studentProfile?.rollNumber}</strong></span>
-            </div>
+            <button
+              onClick={() => setShowProofModal(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold shrink-0 transition-colors cursor-pointer"
+            >
+              Update Payment ID
+            </button>
           </div>
+        )}
 
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+        {/* Live 30-Day Access Countdown Timer */}
+        <AccessCountdownTimer
+          expiryDate={membership?.expiryDate}
+          startDate={membership?.startDate}
+          onOpenPaymentModal={() => setShowProofModal(true)}
+        />
+
+        {/* Action Bar for submitting payment */}
+        <div className="p-4 rounded-2xl bg-white/90 border border-blue-100 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="text-xs text-slate-600">
+            Monthly Coaching Fee: <strong className="text-slate-900 font-mono font-bold text-sm">₹{feeAmount.toLocaleString('en-IN')}</strong> · Roll: <strong className="font-mono text-blue-700">{studentProfile?.rollNumber}</strong>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowProofModal(true)}
+              className="px-4 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Submit Payment ID / UTR (QR)</span>
+            </button>
             <button
               onClick={() => setShowPayModal(true)}
-              className={`px-6 py-3 text-xs font-bold text-white rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
-                isExpired
-                  ? 'bg-red-600 hover:bg-red-500 shadow-red-500/25'
-                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/25'
-              }`}
+              className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <CreditCard className="w-4 h-4" />
-              <span>{isExpired ? 'Pay Now & Activate' : 'Renew / Extend 30 Days'}</span>
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Pay Online Gateway</span>
             </button>
           </div>
         </div>
@@ -182,6 +195,17 @@ export const StudentPayments: React.FC = () => {
       <ReceiptModal
         receipt={activeReceipt}
         onClose={() => setActiveReceipt(null)}
+      />
+
+      {/* Submit Payment Proof Modal */}
+      <SubmitPaymentProofModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        onSuccess={() => {
+          setShowProofModal(false);
+          fetchHistory();
+          refreshProfile();
+        }}
       />
     </div>
   );

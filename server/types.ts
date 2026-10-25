@@ -127,13 +127,14 @@ export interface AttendanceRecord {
 export interface Membership {
   id: string;
   studentId: string;
-  startDate: string; // YYYY-MM-DD
-  expiryDate: string; // YYYY-MM-DD
+  startDate: string; // ISO string
+  expiryDate: string; // ISO string with timestamp e.g. 2026-11-24T16:25:00.000Z
   status: 'active' | 'grace_period' | 'expired';
   lastPaymentDate?: string;
   lastPaymentAmount?: number;
   autoRenew: boolean;
   gracePeriodDays: number;
+  accessDurationDays?: number; // e.g. 30
 }
 
 export interface PaymentReceipt {
@@ -146,7 +147,7 @@ export interface PaymentReceipt {
   batchName: string;
   billingMonth: string; // e.g. "November 2026"
   amount: number;
-  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer';
+  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer' | 'phonepe' | 'gpay' | 'paytm' | 'qr_code';
   transactionId: string;
   paidAt: string;
   receiptDate: string;
@@ -162,23 +163,30 @@ export interface PaymentTransaction {
   amount: number;
   periodStart: string;
   periodEnd: string;
-  status: 'success' | 'pending' | 'failed';
-  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer';
+  status: 'success' | 'pending' | 'failed' | 'rejected';
+  paymentMethod: 'razorpay' | 'cash' | 'upi_direct' | 'bank_transfer' | 'phonepe' | 'gpay' | 'paytm' | 'qr_code';
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
-  receiptNumber: string;
+  receiptNumber?: string;
   teacherNotes?: string;
   createdAt: string;
   idempotencyKey?: string;
+  // Verification & Approval fields
+  utrNumber?: string;
+  screenshotUrl?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  accessGrantedDays?: number;
+  adminRemarks?: string;
 }
 
 export interface AppNotification {
   id: string;
-  recipientId: string; // studentId or 'all' or 'class:<id>'
+  recipientId: string; // studentId or 'all' or 'class:<id>' or 'teacher' or 'owner' or 'admin'
   title: string;
   message: string;
-  type: 'homework' | 'fee_due' | 'payment_success' | 'attendance' | 'announcement';
+  type: 'homework' | 'fee_due' | 'payment_success' | 'attendance' | 'announcement' | 'payment_submitted';
   read: boolean;
   createdAt: string;
   actionUrl?: string;

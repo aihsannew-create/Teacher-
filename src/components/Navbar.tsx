@@ -68,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setCurrentView('classes-info')}
                 className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'classes-info' ? 'text-blue-600 font-bold' : ''}`}
               >
-                {uiTexts.navClasses || 'Classes & Fees'}
+                Classes & Batches
               </button>
               <button
                 onClick={() => setCurrentView('homework-gate')}
@@ -76,6 +76,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                 <span>Homework</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('faq')}
+                className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'faq' ? 'text-blue-600 font-bold' : ''}`}
+              >
+                FAQ
+              </button>
+              <button
+                onClick={() => setCurrentView('contact')}
+                className={`whitespace-nowrap transition-colors hover:text-blue-600 ${currentView === 'contact' ? 'text-blue-600 font-bold' : ''}`}
+              >
+                Contact
               </button>
               <button
                 onClick={() => setCurrentView('about-teacher')}

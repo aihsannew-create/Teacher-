@@ -3,6 +3,7 @@ import { apiFetch } from '../api';
 import { PaymentTransaction, PaymentReceipt, StudentProfile } from '../types';
 import { CreditCard, Plus, Receipt, Printer, Search, Download, CheckCircle2, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { PendingPaymentApprovals } from '../components/PendingPaymentApprovals';
 
 interface TeacherPaymentsProps {
   initialStudentId?: string;
@@ -108,7 +109,8 @@ export const TeacherPayments: React.FC<TeacherPaymentsProps> = ({ initialStudent
     window.open('/api/reports/export-csv?type=payments', '_blank');
   };
 
-  const viewReceiptForNum = (receiptNumber: string) => {
+  const viewReceiptForNum = (receiptNumber?: string) => {
+    if (!receiptNumber) return;
     const found = receipts.find(r => r.receiptNumber === receiptNumber);
     if (found) {
       setActiveReceipt(found);
@@ -187,6 +189,9 @@ export const TeacherPayments: React.FC<TeacherPaymentsProps> = ({ initialStudent
           </div>
         )}
 
+        {/* Pending Payment Verification & 30-Day Access Approvals */}
+        <PendingPaymentApprovals onApprovalSuccess={() => fetchPayments()} />
+
         {/* Search & Filter Bar */}
         <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-xl border border-blue-100 shadow-sm text-xs flex items-center justify-between gap-4">
           <div className="relative w-full max-w-md">
@@ -255,13 +260,19 @@ export const TeacherPayments: React.FC<TeacherPaymentsProps> = ({ initialStudent
                         ₹{p.amount.toLocaleString('en-IN')}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => viewReceiptForNum(p.receiptNumber)}
-                          className="px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-xs"
-                        >
-                          <Printer className="w-3 h-3 text-blue-600" />
-                          <span>View Receipt</span>
-                        </button>
+                        {p.receiptNumber ? (
+                          <button
+                            onClick={() => viewReceiptForNum(p.receiptNumber)}
+                            className="px-3 py-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Printer className="w-3 h-3 text-blue-600" />
+                            <span>View Receipt</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-mono italic">
+                            {p.status === 'pending' ? 'Verification Pending' : 'No Receipt'}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

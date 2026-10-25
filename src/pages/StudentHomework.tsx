@@ -22,9 +22,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Trash2
+  Trash2,
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 import { PaymentModal } from '../components/PaymentModal';
+import { AccessCountdownTimer } from '../components/AccessCountdownTimer';
+import { SubmitPaymentProofModal } from '../components/SubmitPaymentProofModal';
 
 interface StudentHomeworkProps {
   onNavigate: (view: string, extra?: any) => void;
@@ -41,6 +45,9 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const [membershipExpired, setMembershipExpired] = useState(false);
   const [membershipWarning, setMembershipWarning] = useState<string | null>(null);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<any>(null);
+  const [accessValidity, setAccessValidity] = useState<any>(null);
   
   // Gallery viewer with multi-image previous/next navigation
   const [galleryViewer, setGalleryViewer] = useState<{
@@ -59,19 +66,34 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const fetchHomework = async () => {
     setLoading(true);
     try {
-      const [data, clsRes] = await Promise.all([
+      const [data, clsRes, statusRes] = await Promise.all([
         apiFetch(`/api/homework${selectedClass !== 'all' ? `?classId=${selectedClass}` : ''}`),
-        apiFetch('/api/classes').catch(() => ({ classes: [] }))
+        apiFetch('/api/classes').catch(() => ({ classes: [] })),
+        apiFetch('/api/payments/my-status').catch(() => null)
       ]);
       setHomeworkList(data.homework || []);
       setClasses(clsRes.classes || []);
-      if (data.membershipWarning) {
-        setMembershipWarning(data.membershipWarning.message);
+      if (data.accessValidity) {
+        setAccessValidity(data.accessValidity);
+      }
+      if (statusRes?.pendingRequest) {
+        setPendingPayment(statusRes.pendingRequest);
+      } else {
+        setPendingPayment(null);
       }
       setMembershipExpired(false);
     } catch (err: any) {
-      if (err.status === 403 && err.data?.error === 'membership_expired') {
+      if (err.status === 403 && (err.data?.error === 'membership_expired' || err.data?.locked)) {
         setMembershipExpired(true);
+        if (err.data?.pendingRequest) {
+          setPendingPayment(err.data.pendingRequest);
+        } else {
+          apiFetch('/api/payments/my-status')
+            .then(res => {
+              if (res?.pendingRequest) setPendingPayment(res.pendingRequest);
+            })
+            .catch(() => {});
+        }
       } else {
         console.error('Failed to load homework:', err);
       }
@@ -326,37 +348,87 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
           </div>
         )}
 
-        {/* Membership Expired Paywall Banner */}
-        {membershipExpired ? (
-          <div className="p-8 rounded-3xl bg-white/95 backdrop-blur-xl border border-red-200 shadow-[0_15px_40px_rgba(239,68,68,0.08)] text-center space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mx-auto shadow-xs">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-extrabold text-slate-900">
-              Tuition Membership Access Locked
-            </h2>
-            <p className="text-xs text-slate-600 max-w-lg mx-auto leading-relaxed">
-              Your monthly coaching membership for <strong className="text-slate-900 font-semibold">{studentProfile?.className}</strong> is overdue. Daily homework assignments, teaching summaries, notes downloads, and solution submissions are protected by server-side authorization.
-            </p>
+        {/* Live 30-Day Access Countdown Timer (Active State) */}
+        {!membershipExpired && (
+          <AccessCountdownTimer
+            expiryDate={membership?.expiryDate || accessValidity?.expiryDate}
+            startDate={membership?.startDate}
+            onExpire={() => setMembershipExpired(true)}
+            onOpenPaymentModal={() => setShowProofModal(true)}
+          />
+        )}
 
+        {/* Membership Expired / 30-Day Completed Gated Screen */}
+        {membershipExpired ? (
+          <div className="p-6 sm:p-10 rounded-3xl bg-white/95 backdrop-blur-xl border border-red-200 shadow-xl text-center space-y-6">
+            <div className="w-20 h-20 rounded-3xl bg-red-50 border-2 border-red-200 text-red-600 flex items-center justify-center mx-auto shadow-md">
+              <ShieldAlert className="w-10 h-10 animate-bounce" />
+            </div>
+
+            <div className="space-y-2 max-w-xl mx-auto">
+              <span className="px-3 py-1 text-xs font-black uppercase rounded-full bg-red-100 text-red-700 border border-red-300">
+                🔒 Homework Section Band Hai (Locked)
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                30 Din Ka Tuition Access Samapt Ho Gaya Hai
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Niyam anusar <strong>{studentProfile?.className}</strong> ke daily homework, class summaries, blackboard photos aur solution submit karne ke liye fees jama hona avashyak hai. 30 din pura hote hi access automatically band kar diya gaya hai.
+              </p>
+            </div>
+
+            {/* Pending Verification Notice if student has already submitted payment ID */}
+            {pendingPayment ? (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 text-left space-y-2 max-w-xl mx-auto shadow-sm">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm">
+                  <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+                  <span>⏳ Payment Verification Pending (Admin Review Kar Rahe Hain)</span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  Aapne Payment ID / UTR <strong className="font-mono text-blue-700 font-bold">{pendingPayment.utrNumber || pendingPayment.id}</strong> (₹{pendingPayment.amount}) submit kiya hua hai. Admin (AIHSAN ANSARI) dwara approve karte hi aapko <strong>30 din ka purna access</strong> mil jayega aur live timer chalu hoga.
+                </p>
+                <div className="text-[11px] text-amber-800 font-semibold pt-1">
+                  Submitted at: {new Date(pendingPayment.createdAt).toLocaleString('en-IN')}
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 max-w-xl mx-auto text-left text-xs space-y-1.5">
+                <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>30 Din Ka Access Kaise Kholein?</span>
+                </div>
+                <p className="text-slate-600">
+                  1. PhonePe / UPI par tuition fees transfer karein.<br />
+                  2. Neeche diye gaye button par click karke apna <strong>Payment ID / UTR</strong> submit karein.<br />
+                  3. Admin panel me notification aayegi aur Admin approve karte hi homework khul jayega!
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
-                onClick={() => setShowPayModal(true)}
-                className="px-6 py-3 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-all shadow-md shadow-blue-500/25"
+                onClick={() => setShowProofModal(true)}
+                className="w-full sm:w-auto px-6 py-3.5 text-xs sm:text-sm font-extrabold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 cursor-pointer"
               >
-                Pay Monthly Tuition Fee (₹{studentProfile?.monthlyFee || 2500})
+                <CreditCard className="w-4 h-4" />
+                <span>{pendingPayment ? 'Naya Payment ID Submit Karein' : 'Payment ID / UTR Submit Karein (30 Din Access)'}</span>
               </button>
+
+              <button
+                onClick={() => setShowPayModal(true)}
+                className="w-full sm:w-auto px-5 py-3.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
+              >
+                Online Gateway (Cards / UPI)
+              </button>
+
               <button
                 onClick={() => onNavigate('student-payments')}
-                className="px-4 py-3 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+                className="w-full sm:w-auto px-4 py-3.5 text-xs font-semibold text-slate-600 hover:text-blue-600 hover:underline"
               >
-                View Payment History
+                Payment Ledger
               </button>
             </div>
-
-            <p className="text-[11px] text-slate-400 pt-2 font-medium">
-              Once verified on our server, your membership will immediately unlock all homework and records automatically.
-            </p>
           </div>
         ) : (
           <>
@@ -795,6 +867,17 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
         onClose={() => setShowPayModal(false)}
         onPaymentSuccess={() => {
           setShowPayModal(false);
+          refreshProfile();
+          fetchHomework();
+        }}
+      />
+
+      {/* Submit Payment Proof Modal */}
+      <SubmitPaymentProofModal
+        isOpen={showProofModal}
+        onClose={() => setShowProofModal(false)}
+        onSuccess={() => {
+          setShowProofModal(false);
           refreshProfile();
           fetchHomework();
         }}

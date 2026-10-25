@@ -22,8 +22,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Check
+  Check,
+  CreditCard,
+  QrCode
 } from 'lucide-react';
+import { AccessCountdownTimer } from '../components/AccessCountdownTimer';
+import { SubmitPaymentProofModal } from '../components/SubmitPaymentProofModal';
 
 interface HomeworkGatePageProps {
   onNavigate: (view: string, extra?: any) => void;
@@ -81,6 +85,12 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // 30-Day Access & Homework Gate Lock Status
+  const [membershipExpired, setMembershipExpired] = useState(false);
+  const [pendingReq, setPendingReq] = useState<any>(null);
+  const [membershipDetails, setMembershipDetails] = useState<{ expiryDate?: string; isExpired?: boolean } | null>(null);
+  const [showSubmitProof, setShowSubmitProof] = useState(false);
+
   // Countdown timer for lockout
   useEffect(() => {
     if (lockoutSeconds <= 0) return;
@@ -108,14 +118,36 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
   const loadHomework = async () => {
     setFetchingHw(true);
     try {
+      if (user?.role === 'student') {
+        try {
+          const statusRes = await apiFetch('/api/payments/my-status');
+          setMembershipDetails({ expiryDate: statusRes.expiryDate, isExpired: statusRes.isExpired });
+          setPendingReq(statusRes.pendingRequest);
+          if (statusRes.isExpired) {
+            setMembershipExpired(true);
+            setFetchingHw(false);
+            return;
+          }
+        } catch (e) {
+          console.error('Membership check:', e);
+        }
+      }
+
       const [hwRes, clsRes] = await Promise.all([
         apiFetch('/api/homework'),
         apiFetch('/api/classes').catch(() => ({ classes: [] }))
       ]);
       setHomeworkList(hwRes.homework || []);
       setClasses(clsRes.classes || []);
-    } catch (err) {
+      setMembershipExpired(false);
+    } catch (err: any) {
       console.error('Failed to load homework:', err);
+      if (err.status === 403 || err.data?.locked) {
+        setMembershipExpired(true);
+        if (err.data?.pendingRequest) {
+          setPendingReq(err.data.pendingRequest);
+        }
+      }
     } finally {
       setFetchingHw(false);
     }
@@ -559,6 +591,69 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
           </div>
         </div>
 
+        {/* 30-Day Access Countdown Timer for Students */}
+        {user.role === 'student' && (
+          <AccessCountdownTimer
+            expiryDate={membershipDetails?.expiryDate}
+            onExpire={() => setMembershipExpired(true)}
+          />
+        )}
+
+        {/* Gated Access Lock When 30 Days Complete */}
+        {user.role === 'student' && membershipExpired ? (
+          <div className="bg-white rounded-3xl border-2 border-red-200/80 shadow-xl p-8 sm:p-10 text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto border border-red-100 shadow-inner">
+              <Lock className="w-8 h-8 text-red-600" />
+            </div>
+
+            <div className="max-w-md mx-auto space-y-2">
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-red-100 text-red-700 tracking-wider inline-block">
+                Homework Access Locked
+              </span>
+              <h2 className="text-2xl font-black text-slate-900">
+                30 Din Ka Access Samapt Ho Chuka Hai
+              </h2>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Aapki monthly coaching fees ki 30 din ki validity puri ho gayi hai. Homework questions, class notes aur blackboard photos open karne ke liye payment karein aur Transaction ID submit karein.
+              </p>
+            </div>
+
+            {pendingReq ? (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left max-w-lg mx-auto space-y-2">
+                <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                  <Clock className="w-4 h-4 text-amber-600 animate-spin" />
+                  <span>Payment Verification In Progress</span>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  Aapka payment proof (UTR: <span className="font-mono font-bold">{pendingReq.utrNumber || pendingReq.transactionId}</span>) admin ko bhej diya gaya hai. Admin/Teacher cabin se approve hote hi <strong>30 din ka naya access</strong> shuru ho jayega!
+                </p>
+                <div className="text-[11px] text-amber-700 font-mono">
+                  Submitted at: {new Date(pendingReq.submittedAt).toLocaleString()}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitProof(true)}
+                  className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Submit Payment ID / UTR & Unlock</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('student-payments')}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <QrCode className="w-4 h-4 text-slate-500" />
+                  <span>View Fee QR & Validity</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Class Category Bar: Divided by Class ("jis class ko select kre usi ka homework open ho") */}
         <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -773,8 +868,22 @@ export const HomeworkGatePage: React.FC<HomeworkGatePageProps> = ({ onNavigate }
             })}
           </div>
         )}
+          </>
+        )}
 
       </div>
+
+      {/* Submit Payment Proof Modal for Students */}
+      {showSubmitProof && (
+        <SubmitPaymentProofModal
+          isOpen={showSubmitProof}
+          onClose={() => setShowSubmitProof(false)}
+          onSuccess={() => {
+            setShowSubmitProof(false);
+            loadHomework();
+          }}
+        />
+      )}
 
       {/* Teacher: Upload Homework Modal (Only accessible to Teachers) */}
       {showUploadModal && user?.role === 'teacher' && (

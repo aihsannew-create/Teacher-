@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
 import { ClassLevel, LandingContent } from '../types';
 import { AllUiTextEditor } from '../components/AllUiTextEditor';
+import { PendingPaymentApprovals } from '../components/PendingPaymentApprovals';
 import {
   Shield,
   KeyRound,
@@ -25,7 +26,8 @@ import {
   Trash2,
   Save,
   RotateCcw,
-  Type
+  Type,
+  CreditCard
 } from 'lucide-react';
 
 interface TeacherItem {
@@ -65,10 +67,11 @@ interface SummaryData {
 }
 
 export const OwnerAccessControl: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'teachers' | 'students' | 'ui-text' | 'fees'>('teachers');
+  const [activeTab, setActiveTab] = useState<'teachers' | 'students' | 'fee-approvals' | 'ui-text' | 'fees'>('teachers');
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -163,16 +166,18 @@ export const OwnerAccessControl: React.FC = () => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [sumRes, teachRes, studRes, classRes, contentRes] = await Promise.all([
+      const [sumRes, teachRes, studRes, classRes, contentRes, payReqRes] = await Promise.all([
         apiFetch('/api/owner/summary'),
         apiFetch('/api/owner/teachers'),
         apiFetch('/api/owner/students'),
         apiFetch('/api/owner/classes'),
-        apiFetch('/api/owner/content')
+        apiFetch('/api/owner/content'),
+        apiFetch('/api/payments/pending-requests').catch(() => ({ totalPending: 0 }))
       ]);
       setSummary(sumRes);
       setTeachers(teachRes.teachers || []);
       setStudents(studRes.students || []);
+      setPendingPaymentsCount(payReqRes.totalPending || payReqRes.pendingRequests?.length || 0);
       if (classRes.classes) setClassesList(classRes.classes);
       if (contentRes.landingContent) setWebsiteContent(contentRes.landingContent);
     } catch (err: any) {
@@ -581,17 +586,17 @@ export const OwnerAccessControl: React.FC = () => {
           </div>
 
           {/* Quick Metrics KPI cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mt-6">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
             <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-blue-100 shadow-xs">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                Total Teaching Faculty
+                Total Faculty
               </span>
               <div className="flex items-baseline justify-between mt-1.5">
                 <span className="text-2xl font-extrabold text-slate-900">
                   {summary?.totalTeachers ?? teachers.length}
                 </span>
                 <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                  {summary?.activeTeachers ?? teachers.filter(t => t.loginAccessGranted).length} Active IDs
+                  {summary?.activeTeachers ?? teachers.filter(t => t.loginAccessGranted).length} Active
                 </span>
               </div>
             </div>
@@ -617,7 +622,7 @@ export const OwnerAccessControl: React.FC = () => {
             }`}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
-                  Pending Login Approvals
+                  Pending Logins
                 </span>
                 {(summary?.pendingStudentsCount || pendingStudentsList.length) > 0 && (
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
@@ -628,21 +633,50 @@ export const OwnerAccessControl: React.FC = () => {
                   {summary?.pendingStudentsCount ?? pendingStudentsList.length}
                 </span>
                 <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-lg border border-amber-200">
-                  Requires Owner Action
+                  Needs Action
+                </span>
+              </div>
+            </div>
+
+            {/* 4th KPI: Fee Approvals (30-Day Access) */}
+            <div
+              onClick={() => setActiveTab('fee-approvals')}
+              className={`p-4 rounded-2xl border backdrop-blur-md transition-all shadow-xs cursor-pointer ${
+                pendingPaymentsCount > 0
+                  ? 'bg-gradient-to-br from-emerald-50 via-teal-50 to-white border-emerald-400 ring-2 ring-emerald-400/20 shadow-md'
+                  : 'bg-white/90 border-blue-100 hover:border-emerald-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                  Fee Approvals (30-Day)
+                </span>
+                {pendingPaymentsCount > 0 && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                )}
+              </div>
+              <div className="flex items-baseline justify-between mt-1.5">
+                <span className="text-2xl font-extrabold text-emerald-900">
+                  {pendingPaymentsCount}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                  pendingPaymentsCount > 0 ? 'bg-red-500 text-white border-red-600 animate-pulse' : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                }`}>
+                  {pendingPaymentsCount > 0 ? `${pendingPaymentsCount} Action Required` : 'All Clear'}
                 </span>
               </div>
             </div>
 
             <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-blue-100 shadow-xs">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                Authorized Student Logins
+                Authorized Logins
               </span>
               <div className="flex items-baseline justify-between mt-1.5">
                 <span className="text-2xl font-extrabold text-emerald-700">
                   {summary?.approvedStudentsCount ?? students.filter(s => s.loginAccessGranted).length}
                 </span>
                 <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                  Access Granted
+                  Active
                 </span>
               </div>
             </div>
@@ -680,7 +714,7 @@ export const OwnerAccessControl: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-white/90 backdrop-blur-md rounded-2xl border border-blue-100 shadow-xs w-full sm:w-fit mb-6">
           <button
             onClick={() => setActiveTab('teachers')}
-            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'teachers'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/50'
@@ -695,7 +729,7 @@ export const OwnerAccessControl: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('students')}
-            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'students'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/50'
@@ -713,9 +747,31 @@ export const OwnerAccessControl: React.FC = () => {
             )}
           </button>
 
+          {/* Fee Approvals & 30-Day Access Tab */}
+          <button
+            onClick={() => setActiveTab('fee-approvals')}
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'fee-approvals'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25'
+                : 'text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/50'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-emerald-300" />
+            <span>Fee Approvals & 30-Day Access</span>
+            {pendingPaymentsCount > 0 ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-500 text-white font-black animate-pulse">
+                {pendingPaymentsCount} New
+              </span>
+            ) : (
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeTab === 'fee-approvals' ? 'bg-emerald-800 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                0
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setActiveTab('ui-text')}
-            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'ui-text'
                 ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25'
                 : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50/50'
@@ -730,7 +786,7 @@ export const OwnerAccessControl: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('fees')}
-            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'fees'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/50'
@@ -1229,6 +1285,13 @@ export const OwnerAccessControl: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ================= TAB 5: FEE APPROVALS & 30-DAY ACCESS ================= */}
+        {activeTab === 'fee-approvals' && (
+          <div className="space-y-6">
+            <PendingPaymentApprovals onApprovalSuccess={() => fetchAllData()} />
           </div>
         )}
       </div>

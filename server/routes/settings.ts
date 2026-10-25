@@ -60,8 +60,8 @@ router.get('/notifications', requireAuth, (req: AuthenticatedRequest, res: Respo
   const notifs = db.get('notifications');
 
   let userNotifs = [];
-  if (user.role === 'teacher') {
-    userNotifs = notifs.filter(n => n.recipientId === 'teacher' || n.recipientId === 'all');
+  if (user.role === 'teacher' || user.role === 'owner') {
+    userNotifs = notifs.filter(n => n.recipientId === 'teacher' || n.recipientId === 'owner' || n.recipientId === 'admin' || n.recipientId === 'all');
   } else {
     const student = user.studentProfile;
     userNotifs = notifs.filter(

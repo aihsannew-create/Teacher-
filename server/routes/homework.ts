@@ -5,30 +5,57 @@ import { Homework, HomeworkSubmission, AppNotification } from '../types';
 
 const router = Router();
 
-// Helper to check student membership status against current date and grace period
-function isMembershipActive(studentId: string): { active: boolean; isGracePeriod: boolean; expiryDate: string; daysRemaining: number } {
+// Helper to check student membership status against current date and exact timestamp
+function isMembershipActive(studentId: string): {
+  active: boolean;
+  isGracePeriod: boolean;
+  expiryDate: string;
+  daysRemaining: number;
+  timeRemainingMs: number;
+} {
   const memberships = db.get('memberships');
-  const settings = db.get('settings');
   const mem = memberships.find(m => m.studentId === studentId);
 
-  if (!mem) {
-    return { active: false, isGracePeriod: false, expiryDate: '', daysRemaining: -999 };
+  if (!mem || !mem.expiryDate) {
+    return { active: false, isGracePeriod: false, expiryDate: '', daysRemaining: -999, timeRemainingMs: 0 };
   }
 
-  const now = new Date();
-  const expiry = new Date(mem.expiryDate);
-  const diffTime = expiry.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const now = Date.now();
+  const expiryTime = new Date(mem.expiryDate).getTime();
 
-  const gracePeriodDays = settings.gracePeriodDays || 3;
+  // If 30-day validity time has passed: Automatic Access Lockout immediately!
+  if (isNaN(expiryTime) || now >= expiryTime) {
+    if (mem.status !== 'expired') {
+      mem.status = 'expired';
+      db.set('memberships', memberships);
 
-  if (diffDays >= 0) {
-    return { active: true, isGracePeriod: false, expiryDate: mem.expiryDate, daysRemaining: diffDays };
-  } else if (Math.abs(diffDays) <= gracePeriodDays) {
-    return { active: true, isGracePeriod: true, expiryDate: mem.expiryDate, daysRemaining: diffDays };
-  } else {
-    return { active: false, isGracePeriod: false, expiryDate: mem.expiryDate, daysRemaining: diffDays };
+      // Keep student profile in sync
+      const students = db.get('students');
+      const sIdx = students.findIndex(s => s.id === studentId);
+      if (sIdx !== -1 && students[sIdx].status !== 'expired') {
+        students[sIdx].status = 'expired';
+        db.set('students', students);
+      }
+    }
+    return {
+      active: false,
+      isGracePeriod: false,
+      expiryDate: mem.expiryDate,
+      daysRemaining: 0,
+      timeRemainingMs: 0
+    };
   }
+
+  const timeRemainingMs = expiryTime - now;
+  const daysRemaining = Math.ceil(timeRemainingMs / (1000 * 60 * 60 * 24));
+
+  return {
+    active: true,
+    isGracePeriod: false,
+    expiryDate: mem.expiryDate,
+    daysRemaining,
+    timeRemainingMs
+  };
 }
 
 // GET all homework with role-based filtering and server-side membership protection
@@ -84,17 +111,22 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const memberStatus = isMembershipActive(student.id);
   const studentClass = classes.find(c => c.id === student.classId);
 
-  // If student membership is completely expired past grace period, SERVER BLOCKS full homework details
+  // If student membership is completely expired past 30 days, SERVER BLOCKS full homework details
   if (!memberStatus.active) {
+    const payments = db.get('payments');
+    const pendingRequest = payments.find(p => p.studentId === student.id && p.status === 'pending');
+
     return res.status(403).json({
       error: 'membership_expired',
-      message: 'Your tuition membership has expired. Please renew your monthly fee to view daily homework, class summaries, and submit solutions.',
+      locked: true,
+      message: 'Aapki 30 din ki tuition fee validity samapt ho chuki hai. Homework section sirf unhi bacho ke liye khulta hai jinki fees jama aur verified hai.',
       membership: {
         status: 'expired',
         expiryDate: memberStatus.expiryDate,
         monthlyFee: student.customFee || studentClass?.monthlyFee || 2500,
         daysOverdue: Math.abs(memberStatus.daysRemaining)
-      }
+      },
+      pendingRequest: pendingRequest || null
     });
   }
 
@@ -124,10 +156,12 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
 
   return res.json({
     homework: enriched,
-    membershipWarning: memberStatus.isGracePeriod ? {
-      message: `Your membership is currently in a ${Math.abs(memberStatus.daysRemaining)} day grace period. Please clear dues soon.`,
-      daysLeft: Math.abs(memberStatus.daysRemaining)
-    } : null
+    accessValidity: {
+      active: true,
+      expiryDate: memberStatus.expiryDate,
+      timeRemainingMs: memberStatus.timeRemainingMs,
+      daysRemaining: memberStatus.daysRemaining
+    }
   });
 });
 

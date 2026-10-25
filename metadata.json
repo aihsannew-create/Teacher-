@@ -1,6 +1,6 @@
 {
   "name": "XOLARA CLASS   Offline Coaching & Daily Homework Platform",
-  "description": "Complete offline coaching management system with class-wise daily homework, automated monthly fees, attendance tracking, and teacher cabin.",
+  "description": "Complete offline coaching management system with class-wise daily homework, student attendance tracking, FAQ, contact admissions desk, and teacher cabin.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

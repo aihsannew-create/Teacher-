@@ -41,7 +41,7 @@ export const ClassesInfoPage: React.FC<ClassesInfoPageProps> = ({ onNavigate }) 
             <span>{uiTexts.navHome || 'Back to Overview'}</span>
           </button>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {uiTexts.brandName} Batches, Timings & Transparent Fees
+            {uiTexts.brandName} Batches, Subjects & Schedules
           </h1>
           <p className="text-sm text-slate-600 mt-2 max-w-2xl">
             {uiTexts.journeySubtitle || 'Offline classroom coaching with small batch sizes to ensure every student receives personal focus, doubt resolution, and daily verified homework correction.'}
@@ -113,16 +113,17 @@ export const ClassesInfoPage: React.FC<ClassesInfoPageProps> = ({ onNavigate }) 
 
                   <div className="mt-6 pt-4 border-t border-blue-100 flex items-center justify-between">
                     <div>
-                      <span className="text-[11px] text-slate-500 font-medium">Monthly Tuition Fee</span>
-                      <div className="text-xl font-extrabold font-mono text-blue-700 tabular-nums">
-                        ₹{cls.monthlyFee.toLocaleString('en-IN')}<span className="text-xs font-normal text-slate-500"> / mo</span>
+                      <span className="text-[11px] text-slate-500 font-medium">Admissions Status</span>
+                      <div className="text-xs font-bold text-emerald-700 flex items-center gap-1 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Admissions Open</span>
                       </div>
                     </div>
                     <button
-                      onClick={() => onNavigate('register')}
-                      className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-sm shadow-blue-500/25"
+                      onClick={() => onNavigate('contact')}
+                      className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-sm shadow-blue-500/25 cursor-pointer"
                     >
-                      Enroll in Batch
+                      Inquire for Batch
                     </button>
                   </div>
                 </div>

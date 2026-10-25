@@ -11,6 +11,8 @@ import { ClassesInfoPage } from './pages/ClassesInfoPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { HomeworkGatePage } from './pages/HomeworkGatePage';
+import { FaqPage } from './pages/FaqPage';
+import { ContactPage } from './pages/ContactPage';
 
 // Owner Cabin Page
 import { OwnerAccessControl } from './pages/OwnerAccessControl';
@@ -97,7 +99,9 @@ function AppContent() {
   // Readable breadcrumb title for the current view
   const getViewTitle = (view: string) => {
     switch (view) {
-      case 'classes-info': return 'Classes & Fee Structure';
+      case 'classes-info': return 'Classes & Batch Schedules';
+      case 'faq': return 'Frequently Asked Questions (FAQ)';
+      case 'contact': return 'Contact & Admissions Desk';
       case 'homework-gate': return 'Homework';
       case 'login': return 'Account Login';
       case 'register': return 'Student Registration';
@@ -161,8 +165,9 @@ function AppContent() {
       <main className="flex-1 pb-16 md:pb-0">
         {currentView === 'landing' && <LandingPage onNavigate={handleNavigate} />}
         {currentView === 'classes-info' && <ClassesInfoPage onNavigate={handleNavigate} />}
+        {currentView === 'faq' && <FaqPage onNavigate={handleNavigate} />}
+        {currentView === 'contact' && <ContactPage onNavigate={handleNavigate} />}
         {currentView === 'about-teacher' && <LandingPage onNavigate={handleNavigate} />}
-        {currentView === 'contact' && <LandingPage onNavigate={handleNavigate} />}
         {currentView === 'homework-gate' && <HomeworkGatePage onNavigate={handleNavigate} />}
         {currentView === 'login' && <LoginPage onNavigate={handleNavigate} extra={navigationExtra} />}
         {currentView === 'register' && <RegisterPage onNavigate={handleNavigate} />}

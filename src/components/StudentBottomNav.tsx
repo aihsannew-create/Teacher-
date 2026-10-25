@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, CalendarCheck, CreditCard, LayoutDashboard } from 'lucide-react';
+import { BookOpen, CalendarCheck, HelpCircle, LayoutDashboard } from 'lucide-react';
 
 interface StudentBottomNavProps {
   currentView: string;
@@ -48,13 +48,13 @@ export const StudentBottomNav: React.FC<StudentBottomNavProps> = ({
       </button>
 
       <button
-        onClick={() => setCurrentView('student-payments')}
+        onClick={() => setCurrentView('faq')}
         className={`flex flex-col items-center py-1 px-3 text-[11px] font-medium transition-colors ${
-          currentView === 'student-payments' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-900'
+          currentView === 'faq' ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-slate-900'
         }`}
       >
-        <CreditCard className="w-5 h-5 mb-0.5" />
-        <span>Fees</span>
+        <HelpCircle className="w-5 h-5 mb-0.5" />
+        <span>FAQ</span>
       </button>
     </div>
   );
