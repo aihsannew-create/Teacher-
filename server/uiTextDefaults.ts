@@ -1,4 +1,4 @@
-import { AllUiTexts } from './types';
+import type { AllUiTexts } from './types.ts';
 
 export const defaultAllUiTexts: AllUiTexts = {
   // A: Branding & Navigation

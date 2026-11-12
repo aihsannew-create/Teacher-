@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import {
+import type {
   User,
   StudentProfile,
   ClassLevel,
@@ -15,8 +15,8 @@ import {
   TeacherSettings,
   AuditLog,
   AdmissionInquiry
-} from './types';
-import { defaultAllUiTexts } from './uiTextDefaults';
+} from './types.ts';
+import { defaultAllUiTexts } from './uiTextDefaults.ts';
 
 export interface DatabaseSchema {
   users: User[];

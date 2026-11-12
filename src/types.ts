@@ -93,6 +93,9 @@ export interface Homework {
   instructions: string;
   publishDate: string;
   deadlineDate: string;
+  title?: string;
+  description?: string;
+  deadline?: string;
   maxMarks: number;
   priority: 'normal' | 'high' | 'urgent';
   attachments: HomeworkAttachment[];

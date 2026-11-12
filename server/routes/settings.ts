@@ -1,8 +1,10 @@
-import { Router, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, requireTeacher, AuthenticatedRequest } from '../auth';
-import { AppNotification } from '../types';
-import { defaultAllUiTexts } from '../uiTextDefaults';
+import { Router } from 'express';
+import type { Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth, requireTeacher } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { AppNotification } from '../types.ts';
+import { defaultAllUiTexts } from '../uiTextDefaults.ts';
 
 const router = Router();
 

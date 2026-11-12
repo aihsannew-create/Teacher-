@@ -3,6 +3,7 @@ import { apiFetch } from '../api';
 import { Users, CreditCard, BookOpen, AlertCircle, TrendingUp, Download, Plus, Clock } from 'lucide-react';
 import { PaymentReceipt } from '../types';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { PendingPaymentApprovals } from '../components/PendingPaymentApprovals';
 import { useUiText } from '../context/UiTextContext';
 
 interface TeacherDashboardProps {
@@ -17,24 +18,30 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
   const [loading, setLoading] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
 
+  const fetchDashboard = async () => {
+    try {
+      const data = await apiFetch('/api/reports/dashboard');
+      setMetrics(data.metrics);
+      setRecentPayments(data.recentPayments || []);
+      setBatchStats(data.batchStats || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const data = await apiFetch('/api/reports/dashboard');
-        setMetrics(data.metrics);
-        setRecentPayments(data.recentPayments || []);
-        setBatchStats(data.batchStats || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDashboard();
   }, []);
 
   const handleExportPayments = () => {
-    window.open('/api/reports/export-csv?type=payments', '_blank');
+    const a = document.createElement('a');
+    a.href = '/api/reports/export-csv?type=payments';
+    a.download = 'tuition_payments.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -148,6 +155,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
             </div>
           </div>
         </div>
+
+        {/* Pending UPI Fee Verification & Approvals (Requirement 1) */}
+        <PendingPaymentApprovals onApprovalSuccess={fetchDashboard} />
 
         {/* Quick Review Alert If Pending Homework */}
         {metrics?.pendingReviewSubmissions > 0 && (

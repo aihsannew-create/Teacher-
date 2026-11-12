@@ -61,8 +61,10 @@ export const AccessCountdownTimer: React.FC<AccessCountdownTimerProps> = ({
     return () => clearInterval(timer);
   }, [expiryDate]);
 
-  // Compute progress percentage across 30 days (default window = 30 * 86400 * 1000)
-  const totalWindowMs = 30 * 24 * 60 * 60 * 1000;
+  // Compute progress percentage across subscription window (exact calendar month duration or default 30 days)
+  const totalWindowMs = startDate && expiryDate && !isNaN(new Date(startDate).getTime()) && !isNaN(new Date(expiryDate).getTime())
+    ? Math.max(1, new Date(expiryDate).getTime() - new Date(startDate).getTime())
+    : 30 * 24 * 60 * 60 * 1000;
   const elapsedMs = totalWindowMs - timeLeft.totalMs;
   const progressPercent = Math.min(100, Math.max(0, (elapsedMs / totalWindowMs) * 100));
   const remainingPercent = Math.max(0, 100 - progressPercent);

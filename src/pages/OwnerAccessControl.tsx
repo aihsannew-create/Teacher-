@@ -3,6 +3,7 @@ import { apiFetch } from '../api';
 import { ClassLevel, LandingContent } from '../types';
 import { AllUiTextEditor } from '../components/AllUiTextEditor';
 import { PendingPaymentApprovals } from '../components/PendingPaymentApprovals';
+import { TeacherHomework } from './TeacherHomework';
 import {
   Shield,
   KeyRound,
@@ -55,6 +56,9 @@ interface StudentItem {
   passwordPreview: string;
   loginAccessGranted: boolean;
   membershipStatus: string;
+  subscriptionStatus?: 'active' | 'expired' | 'pending' | 'none';
+  membershipStartDate?: string | null;
+  membershipExpiryDate?: string | null;
   approvedByOwnerAt?: string;
 }
 
@@ -67,7 +71,7 @@ interface SummaryData {
 }
 
 export const OwnerAccessControl: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'teachers' | 'students' | 'fee-approvals' | 'ui-text' | 'fees'>('teachers');
+  const [activeTab, setActiveTab] = useState<'teachers' | 'students' | 'fee-approvals' | 'homework' | 'ui-text' | 'fees'>('teachers');
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
@@ -140,8 +144,10 @@ export const OwnerAccessControl: React.FC = () => {
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [newStudentPassword, setNewStudentPassword] = useState('student123');
+  const [newStudentRollNumber, setNewStudentRollNumber] = useState('');
   const [newStudentPhone, setNewStudentPhone] = useState('');
   const [newStudentClass, setNewStudentClass] = useState('cls_10');
+  const [newStudentSubscriptionStatus, setNewStudentSubscriptionStatus] = useState<'expired' | 'active'>('expired');
   const [newStudentGuardian, setNewStudentGuardian] = useState('');
   const [newStudentGuardianPhone, setNewStudentGuardianPhone] = useState('');
 
@@ -357,8 +363,10 @@ export const OwnerAccessControl: React.FC = () => {
           name: newStudentName,
           email: newStudentEmail,
           password: newStudentPassword,
+          rollNumber: newStudentRollNumber.trim() || undefined,
           phone: newStudentPhone,
           classId: newStudentClass,
+          initialSubscriptionStatus: newStudentSubscriptionStatus,
           guardianName: newStudentGuardian,
           guardianPhone: newStudentGuardianPhone
         })
@@ -372,7 +380,9 @@ export const OwnerAccessControl: React.FC = () => {
       }
       setNewStudentName('');
       setNewStudentEmail('');
+      setNewStudentRollNumber('');
       setNewStudentPhone('');
+      setNewStudentSubscriptionStatus('expired');
       setNewStudentGuardian('');
       setNewStudentGuardianPhone('');
 
@@ -769,6 +779,19 @@ export const OwnerAccessControl: React.FC = () => {
             )}
           </button>
 
+          {/* Class-Wise Homework Tab */}
+          <button
+            onClick={() => setActiveTab('homework')}
+            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'homework'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50/50'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Class-Wise Homework</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('ui-text')}
             className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -1070,6 +1093,7 @@ export const OwnerAccessControl: React.FC = () => {
                       <th className="py-3.5 px-4">Class & Batch</th>
                       <th className="py-3.5 px-4">Login ID (Email)</th>
                       <th className="py-3.5 px-4">Initial Password</th>
+                      <th className="py-3.5 px-4">Monthly Fee Status</th>
                       <th className="py-3.5 px-4">Owner Login Access</th>
                       <th className="py-3.5 px-4 text-right">Owner Controls & ID/Pass</th>
                     </tr>
@@ -1077,7 +1101,7 @@ export const OwnerAccessControl: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {filteredStudents.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
                           <UserX className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                           <div className="font-bold text-slate-600">No students found matching your search.</div>
                           <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1097,7 +1121,7 @@ export const OwnerAccessControl: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] font-mono text-blue-600">{s.rollNumber}</div>
+                            <div className="text-[11px] font-mono text-blue-600 font-bold">{s.rollNumber}</div>
                             <div className="text-[10px] text-slate-400">{s.phone}</div>
                           </td>
 
@@ -1129,6 +1153,30 @@ export const OwnerAccessControl: React.FC = () => {
                                 )}
                               </button>
                             </div>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            {s.subscriptionStatus === 'active' || (s.membershipExpiryDate && new Date(s.membershipExpiryDate).getTime() > Date.now()) ? (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Active (1 Month Access)</span>
+                                </span>
+                                {s.membershipExpiryDate && (
+                                  <div className="text-[10px] text-slate-500">
+                                    Valid till: {new Date(s.membershipExpiryDate).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                  <AlertCircle className="w-3 h-3 text-rose-500" />
+                                  <span>Expired / Unpaid</span>
+                                </span>
+                                <div className="text-[10px] text-slate-400">Needs Fee Approval</div>
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -1292,6 +1340,13 @@ export const OwnerAccessControl: React.FC = () => {
         {activeTab === 'fee-approvals' && (
           <div className="space-y-6">
             <PendingPaymentApprovals onApprovalSuccess={() => fetchAllData()} />
+          </div>
+        )}
+
+        {/* ================= TAB 6: CLASS-WISE HOMEWORK ================= */}
+        {activeTab === 'homework' && (
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-blue-100 p-4 sm:p-6 shadow-xs">
+            <TeacherHomework onNavigate={() => {}} embedded />
           </div>
         )}
       </div>
@@ -1693,6 +1748,32 @@ export const OwnerAccessControl: React.FC = () => {
                     placeholder="9823000000"
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Student ID / Roll No <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newStudentRollNumber}
+                    onChange={e => setNewStudentRollNumber(e.target.value)}
+                    placeholder="Auto (e.g. PTA-10-05)"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Monthly Subscription Status</label>
+                  <select
+                    value={newStudentSubscriptionStatus}
+                    onChange={e => setNewStudentSubscriptionStatus(e.target.value as 'expired' | 'active')}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-500 font-semibold"
+                  >
+                    <option value="expired">Unpaid / Expired (Requires Fee Approval)</option>
+                    <option value="active">Active (Pre-Approve 1 Month Subscription)</option>
+                  </select>
                 </div>
               </div>
 

@@ -1,7 +1,9 @@
-import { Router, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../auth';
-import { Homework, HomeworkSubmission, AppNotification } from '../types';
+import { Router } from 'express';
+import type { Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { Homework, HomeworkSubmission, AppNotification } from '../types.ts';
 
 const router = Router();
 
@@ -111,35 +113,39 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const memberStatus = isMembershipActive(student.id);
   const studentClass = classes.find(c => c.id === student.classId);
 
-  // If student membership is completely expired past 30 days, SERVER BLOCKS full homework details
+  // If student membership is expired or inactive, SERVER BLOCKS full homework details
   if (!memberStatus.active) {
     const payments = db.get('payments');
     const pendingRequest = payments.find(p => p.studentId === student.id && p.status === 'pending');
+    const latestRejectedRequest = payments
+      .filter(p => p.studentId === student.id && p.status === 'rejected')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
 
     return res.status(403).json({
       error: 'membership_expired',
       locked: true,
-      message: 'Aapki 30 din ki tuition fee validity samapt ho chuki hai. Homework section sirf unhi bacho ke liye khulta hai jinki fees jama aur verified hai.',
+      message: 'Aapki monthly tuition subscription samapt ho chuki hai. Homework aur study materials sirf active subscription wale bacho ke liye uplabdh hain.',
       membership: {
         status: 'expired',
         expiryDate: memberStatus.expiryDate,
         monthlyFee: student.customFee || studentClass?.monthlyFee || 2500,
         daysOverdue: Math.abs(memberStatus.daysRemaining)
       },
-      pendingRequest: pendingRequest || null
+      pendingRequest: pendingRequest || null,
+      latestRejectedRequest
     });
   }
 
-  // 2. Class Selection: Allow filtering by selected class or 'all'
-  const targetClassId = typeof req.query.classId === 'string'
-    ? req.query.classId
-    : 'all';
+  // 2. Strict Class Isolation: Student can ONLY view homework for their assigned class
+  const targetClassId = typeof req.query.classId === 'string' ? req.query.classId : student.classId;
+  if (targetClassId !== 'all' && targetClassId !== student.classId) {
+    return res.status(403).json({
+      error: 'Access denied. You can only view homework for your assigned class.'
+    });
+  }
 
-  const eligibleHomework = allHw.filter(h => {
-    if (h.isDraft) return false; // Never show drafts to students
-    if (targetClassId !== 'all' && h.classId !== targetClassId) return false;
-    return true;
-  });
+  // Filter strictly to non-draft homework belonging to student's assigned class
+  const eligibleHomework = allHw.filter(h => !h.isDraft && h.classId === student.classId);
 
   // Attach student's submission status
   const enriched = eligibleHomework.map(hw => {
@@ -181,7 +187,7 @@ router.get('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const batches = db.get('batches');
   const cls = classes.find(c => c.id === hw.classId);
 
-  if (user.role === 'teacher') {
+  if (user.role === 'teacher' || user.role === 'owner') {
     const hwSubs = submissions.filter(s => s.homeworkId === hw.id);
     return res.json({
       homework: hw,
@@ -229,11 +235,14 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     batchIds,
     subject,
     chapter,
+    title,
     topic,
     teachingSummary,
     instructions,
+    description,
     publishDate,
     deadlineDate,
+    deadline,
     maxMarks,
     priority,
     attachments,
@@ -241,12 +250,14 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     isDraft
   } = req.body;
 
-  const hwInstructions = instructions?.trim() || req.body.homeworkText?.trim() || 'Complete assigned exercises.';
-  const hwSummary = teachingSummary?.trim() || req.body.forWhom?.trim() || `Notes for ${chapter}`;
-  const hwTopic = topic?.trim() || req.body.forWhom?.trim() || '';
+  const effectiveChapter = (chapter || title || topic || 'Daily Homework').trim();
+  const effectiveSubject = (subject || 'General Study').trim();
+  const effectiveInstructions = (instructions || description || req.body.homeworkText || 'Complete assigned work.').trim();
+  const effectiveSummary = (teachingSummary || description || `Summary & lecture notes for ${effectiveChapter}`).trim();
+  const effectiveDeadline = deadlineDate || deadline || new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
-  if (!classId || !subject || !chapter) {
-    return res.status(400).json({ error: 'Class, subject, and chapter name are required.' });
+  if (!classId) {
+    return res.status(400).json({ error: 'Class is required to assign homework.' });
   }
 
   const allHw = db.get('homework');
@@ -254,13 +265,13 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     id: `hw_${Date.now()}`,
     classId,
     batchIds: Array.isArray(batchIds) && batchIds.length > 0 ? batchIds : ['all'],
-    subject: subject.trim(),
-    chapter: chapter.trim(),
-    topic: hwTopic,
-    teachingSummary: hwSummary,
-    instructions: hwInstructions,
+    subject: effectiveSubject,
+    chapter: effectiveChapter,
+    topic: topic?.trim() || effectiveChapter,
+    teachingSummary: effectiveSummary,
+    instructions: effectiveInstructions,
     publishDate: publishDate || new Date().toISOString(),
-    deadlineDate: deadlineDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    deadlineDate: effectiveDeadline,
     maxMarks: Number(maxMarks) || 20,
     priority: priority || 'normal',
     attachments: Array.isArray(attachments) ? attachments : [],
@@ -281,7 +292,7 @@ router.post('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
       id: `notif_${Date.now()}`,
       recipientId: `class:${classId}`,
       title: `New Homework: ${newHw.subject} (${newHw.chapter})`,
-      message: `Daily homework and teaching summary posted for ${clsName}. Topic: ${newHw.topic || newHw.chapter}.`,
+      message: `Daily homework posted for ${clsName}. Topic: ${newHw.chapter}. Deadline: ${new Date(newHw.deadlineDate).toLocaleDateString('en-IN')}`,
       type: 'homework',
       read: false,
       createdAt: new Date().toISOString()
@@ -305,9 +316,14 @@ router.put('/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ error: 'Homework not found.' });
   }
 
+  const payload = { ...req.body };
+  if (payload.title && !payload.chapter) payload.chapter = payload.title;
+  if (payload.description && !payload.instructions) payload.instructions = payload.description;
+  if (payload.deadline && !payload.deadlineDate) payload.deadlineDate = payload.deadline;
+
   const updated: Homework = {
     ...allHw[index],
-    ...req.body,
+    ...payload,
     updatedAt: new Date().toISOString()
   };
 

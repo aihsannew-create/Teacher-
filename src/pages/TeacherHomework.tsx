@@ -25,9 +25,10 @@ import {
 
 interface TeacherHomeworkProps {
   onNavigate: (view: string, extra?: any) => void;
+  embedded?: boolean;
 }
 
-export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) => {
+export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate, embedded = false }) => {
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [classes, setClasses] = useState<ClassLevel[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -169,10 +170,16 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
 
   const handleSaveHomework = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.classId || !formData.subject || !formData.chapter || !formData.teachingSummary || !formData.instructions) {
-      setFormError('Please fill in class, subject, chapter, lecture summary, and instructions.');
+    if (!formData.classId || !formData.chapter || !formData.instructions) {
+      setFormError('Please select a class and fill in the homework title/chapter and description/instructions.');
       return;
     }
+
+    const payload = {
+      ...formData,
+      subject: formData.subject.trim() || 'General Studies',
+      teachingSummary: formData.teachingSummary.trim() || `Daily lecture guide and notes for ${formData.chapter}. Complete assigned tasks before deadline.`
+    };
 
     setSaving(true);
     setFormError(null);
@@ -180,15 +187,15 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
       if (editingHw) {
         await apiFetch(`/api/homework/${editingHw.id}`, {
           method: 'PUT',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
-        setToastMsg({ type: 'success', text: 'Homework & teaching summary updated successfully!' });
+        setToastMsg({ type: 'success', text: 'Homework & assignment updated successfully!' });
       } else {
         await apiFetch('/api/homework', {
           method: 'POST',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
-        setToastMsg({ type: 'success', text: 'New daily homework & lecture summary published to class!' });
+        setToastMsg({ type: 'success', text: 'New class homework published successfully!' });
       }
       setTimeout(() => setToastMsg(null), 4000);
       setShowModal(false);
@@ -273,6 +280,34 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
     }));
   };
 
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const dataUrl = loadEvent.target?.result as string;
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        setFormData(prev => ({
+          ...prev,
+          attachments: [
+            ...prev.attachments,
+            {
+              id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              name: file.name,
+              fileType: isPdf ? 'pdf' : 'doc',
+              fileUrl: dataUrl,
+              size: `${sizeMb} MB`
+            }
+          ]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
   const handleAddAttachment = (nameToAdd?: string) => {
     const name = nameToAdd || customAttachmentName.trim();
     if (!name) return;
@@ -293,12 +328,12 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
     setShowAttachmentInput(false);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40 text-slate-800 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header with Back Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-blue-100/90">
-          <div className="flex items-center gap-3">
+  const content = (
+    <div className={embedded ? 'space-y-6' : 'max-w-7xl mx-auto space-y-6'}>
+      {/* Header with Back Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-blue-100/90">
+        <div className="flex items-center gap-3">
+          {!embedded && (
             <button
               type="button"
               onClick={() => onNavigate('back')}
@@ -307,22 +342,23 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
             >
               <ArrowLeft className="w-5 h-5 text-slate-600 group-hover:-translate-x-0.5 group-hover:text-blue-600 transition-transform" />
             </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-                  Daily Classroom Homework Management
-                </h1>
-                <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">
-                  Teacher Cabin
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Publish class-specific daily lecture summaries, board photo attachments, and review student solutions
-              </p>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+                Class-Wise Homework Management
+              </h1>
+              <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">
+                {embedded ? 'Admin Dashboard' : 'Teacher Cabin'}
+              </span>
             </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Select class, add homework title, description, deadline, and upload PDF worksheets or images
+            </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <button
               onClick={openCreateModal}
               className="px-4 py-2.5 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-md shadow-blue-500/25 flex items-center gap-1.5 cursor-pointer"
@@ -563,7 +599,6 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
             ))}
           </div>
         )}
-      </div>
 
       {/* Create / Edit Homework Modal in White Glass */}
       {showModal && (
@@ -783,15 +818,28 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
               {/* Attachments (PDF/Docs tool) */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-slate-700">Additional PDF / Document Files</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAttachmentInput(!showAttachmentInput)}
-                    className="text-[11px] text-blue-600 font-bold hover:underline flex items-center gap-1"
-                  >
-                    <Paperclip className="w-3 h-3" />
-                    <span>{showAttachmentInput ? 'Hide Attachment Tool' : '+ Add PDF / Worksheet File'}</span>
-                  </button>
+                  <label className="text-xs font-semibold text-slate-700">PDF / Document Attachments</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-blue-600 font-bold hover:underline flex items-center gap-1 cursor-pointer bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                      <Upload className="w-3 h-3 text-blue-600" />
+                      <span>+ Upload PDF / Document</span>
+                      <input
+                        type="file"
+                        accept="application/pdf,image/*,.doc,.docx"
+                        multiple
+                        onChange={handlePdfUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAttachmentInput(!showAttachmentInput)}
+                      className="text-[11px] text-slate-500 font-semibold hover:underline flex items-center gap-1"
+                    >
+                      <Paperclip className="w-3 h-3" />
+                      <span>{showAttachmentInput ? 'Hide' : 'Quick Presets'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {showAttachmentInput && (
@@ -1000,6 +1048,16 @@ export const TeacherHomework: React.FC<TeacherHomeworkProps> = ({ onNavigate }) 
           </div>
         </div>
       )}
+    </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50/60 via-slate-50 to-indigo-50/40 text-slate-800 py-8 px-4 sm:px-6 lg:px-8">
+      {content}
     </div>
   );
 };

@@ -1,7 +1,9 @@
-import { Router, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, requireTeacher, AuthenticatedRequest } from '../auth';
-import { AttendanceRecord } from '../types';
+import { Router } from 'express';
+import type { Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth, requireTeacher } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { AttendanceRecord } from '../types.ts';
 
 const router = Router();
 

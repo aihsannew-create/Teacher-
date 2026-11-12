@@ -200,10 +200,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, extra }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username Input */}
+            {/* Username / Student ID Input */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Username
+                Student ID / Username / Email / Phone
               </label>
               <div className="relative">
                 <input
@@ -212,7 +212,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, extra }) => {
                   disabled={lockoutSeconds > 0 || loading}
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  placeholder="Enter username, email or mobile"
+                  placeholder="Student ID (e.g. PTA-10-02), Email or Mobile"
                   className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-white border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
                 <User className="absolute right-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />

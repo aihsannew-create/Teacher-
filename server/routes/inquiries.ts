@@ -1,7 +1,9 @@
-import { Router, Request, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, requireTeacher, AuthenticatedRequest } from '../auth';
-import { AdmissionInquiry, AppNotification, InquiryStatus } from '../types';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth, requireTeacher } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { AdmissionInquiry, AppNotification, InquiryStatus } from '../types.ts';
 
 const router = Router();
 

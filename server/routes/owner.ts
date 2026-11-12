@@ -1,8 +1,10 @@
-import { Router, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, requireOwner, AuthenticatedRequest } from '../auth';
-import { User, StudentProfile, Membership, AllUiTexts, LandingContent } from '../types';
-import { defaultAllUiTexts } from '../uiTextDefaults';
+import { Router } from 'express';
+import type { Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth, requireOwner, addOneCalendarMonth } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { User, StudentProfile, Membership, AllUiTexts, LandingContent } from '../types.ts';
+import { defaultAllUiTexts } from '../uiTextDefaults.ts';
 
 const router = Router();
 
@@ -198,6 +200,8 @@ router.get('/students', (_req: AuthenticatedRequest, res: Response) => {
   const batches = db.get('batches');
   const memberships = db.get('memberships');
 
+  const now = Date.now();
+
   const enriched = students.map(student => {
     const user = users.find(u => u.id === student.userId);
     const cls = classes.find(c => c.id === student.classId);
@@ -205,6 +209,7 @@ router.get('/students', (_req: AuthenticatedRequest, res: Response) => {
     const mem = memberships.find(m => m.studentId === student.id);
 
     const loginAccessGranted = student.loginAccessGranted !== false && user?.loginAccessGranted !== false;
+    const isSubscriptionActive = !!(mem && mem.status === 'active' && mem.expiryDate && new Date(mem.expiryDate).getTime() > now);
 
     return {
       ...student,
@@ -214,7 +219,10 @@ router.get('/students', (_req: AuthenticatedRequest, res: Response) => {
       userPhone: user ? user.phone : student.phone,
       passwordPreview: user ? user.passwordHash : 'student123',
       loginAccessGranted,
-      membershipStatus: mem ? mem.status : 'expired'
+      membershipStatus: isSubscriptionActive ? 'active' : 'expired',
+      subscriptionStatus: isSubscriptionActive ? 'active' : 'expired',
+      membershipStartDate: mem ? mem.startDate : '',
+      membershipExpiryDate: mem ? mem.expiryDate : ''
     };
   });
 
@@ -228,12 +236,14 @@ router.post('/students', (req: AuthenticatedRequest, res: Response) => {
     email,
     password,
     phone,
+    rollNumber,
     classId,
     batchId,
     guardianName,
     guardianPhone,
     guardianRelation,
-    customFee
+    customFee,
+    initialSubscriptionStatus = 'expired'
   } = req.body;
 
   if (!name || !email || !password || !classId) {
@@ -247,9 +257,21 @@ router.post('/students', (req: AuthenticatedRequest, res: Response) => {
     return res.status(409).json({ error: 'An account with this email address already exists.' });
   }
 
+  const studentsList = db.get('students');
+  const cleanRoll = (rollNumber || `PTA-${Math.floor(1000 + Math.random() * 9000)}`).trim();
+  const existingRoll = studentsList.find(s => s.rollNumber.toLowerCase() === cleanRoll.toLowerCase());
+  if (existingRoll) {
+    return res.status(409).json({ error: `Student ID / Roll Number "${cleanRoll}" is already assigned to another student.` });
+  }
+
   const userId = `usr_stu_${Date.now()}`;
   const studentId = `stu_${Date.now()}`;
-  const rollNumber = `PTA-${Math.floor(1000 + Math.random() * 9000)}`;
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const isInitiallyActive = initialSubscriptionStatus === 'active';
+  const subStartDate = nowIso;
+  const subExpiryDate = isInitiallyActive ? addOneCalendarMonth(now).toISOString() : nowIso;
 
   const newUser: User = {
     id: userId,
@@ -259,7 +281,7 @@ router.post('/students', (req: AuthenticatedRequest, res: Response) => {
     role: 'student',
     passwordHash: password,
     loginAccessGranted: true, // Directly approved by Owner
-    createdAt: new Date().toISOString()
+    createdAt: nowIso
   };
 
   const newStudent: StudentProfile = {
@@ -268,43 +290,40 @@ router.post('/students', (req: AuthenticatedRequest, res: Response) => {
     name: name.trim(),
     email: cleanEmail,
     phone: phone?.trim() || '',
-    rollNumber,
+    rollNumber: cleanRoll,
     classId,
     batchId: batchId || 'all',
     guardianName: guardianName?.trim() || 'Parent',
     guardianPhone: guardianPhone?.trim() || '',
     guardianRelation: guardianRelation?.trim() || 'Parent',
-    enrollmentDate: new Date().toISOString().split('T')[0],
-    status: 'active',
+    enrollmentDate: nowIso.split('T')[0],
+    status: isInitiallyActive ? 'active' : 'pending_payment',
     loginAccessGranted: true,
-    approvedByOwnerAt: new Date().toISOString(),
+    approvedByOwnerAt: nowIso,
     customFee: customFee ? Number(customFee) : undefined
   };
-
-  const nextMonth = new Date();
-  nextMonth.setDate(nextMonth.getDate() + 30);
 
   const newMembership: Membership = {
     id: `mem_${Date.now()}`,
     studentId,
-    startDate: new Date().toISOString().split('T')[0],
-    expiryDate: nextMonth.toISOString().split('T')[0],
-    status: 'active',
+    startDate: subStartDate,
+    expiryDate: subExpiryDate,
+    status: isInitiallyActive ? 'active' : 'expired',
     autoRenew: false,
     gracePeriodDays: 3
   };
 
   db.set('users', [...users, newUser]);
-  db.set('students', [...db.get('students'), newStudent]);
+  db.set('students', [...studentsList, newStudent]);
   db.set('memberships', [...db.get('memberships'), newMembership]);
 
   return res.status(201).json({
-    message: `Student account created and login access granted for ${name}.`,
+    message: `Student account created for ${name} with Student ID ${cleanRoll}.`,
     student: newStudent,
     credentials: {
       email: cleanEmail,
       password,
-      rollNumber
+      rollNumber: cleanRoll
     }
   });
 });

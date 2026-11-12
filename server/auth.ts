@@ -1,7 +1,7 @@
 import crypto from 'crypto';
-import { Request, Response, NextFunction } from 'express';
-import { db } from './db';
-import { User, StudentProfile, Membership } from './types';
+import type { Request, Response, NextFunction } from 'express';
+import { db } from './db.ts';
+import type { User, StudentProfile, Membership } from './types.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'prerna_tuition_super_secret_jwt_key_2026';
 
@@ -38,6 +38,76 @@ export function verifyToken(token: string): any | null {
   }
 }
 
+export function addOneCalendarMonth(fromDate: Date): Date {
+  const d = new Date(fromDate.getTime());
+  const targetMonth = d.getMonth() + 1;
+  d.setMonth(targetMonth);
+  // Handle month length overflow (e.g. Jan 31 -> March 3 if Feb has 28 days)
+  if (d.getMonth() !== targetMonth % 12) {
+    d.setDate(0);
+  }
+  return d;
+}
+
+export function syncAndEnrichStudentSession(user: User): {
+  studentProfile?: StudentProfile;
+  membership?: Membership & { isActive: boolean; daysRemaining: number };
+} {
+  if (user.role !== 'student') {
+    return {};
+  }
+
+  const students = db.get('students');
+  const student = students.find(s => s.userId === user.id);
+  if (!student) {
+    return {};
+  }
+
+  // Enrich with class details
+  const classes = db.get('classes');
+  const cls = classes.find(c => c.id === student.classId);
+  if (cls) {
+    student.className = cls.name;
+    student.batchName = cls.batchName || 'Regular Batch';
+    student.monthlyFee = cls.monthlyFee;
+  }
+
+  // Check and sync membership
+  const memberships = db.get('memberships');
+  let membership = memberships.find(m => m.studentId === student.id);
+  
+  const now = Date.now();
+  let isActive = false;
+  let daysRemaining = 0;
+
+  if (membership && membership.expiryDate) {
+    const expiryTime = new Date(membership.expiryDate).getTime();
+    const diffMs = expiryTime - now;
+
+    if (membership.status === 'active' && diffMs > 0) {
+      isActive = true;
+      daysRemaining = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+    } else {
+      if (membership.status === 'active') {
+        membership.status = 'expired';
+        student.status = 'expired';
+        db.save();
+      }
+      isActive = false;
+      daysRemaining = 0;
+    }
+  } else {
+    isActive = false;
+    daysRemaining = 0;
+  }
+
+  const enrichedMembership = membership
+    ? { ...membership, isActive, daysRemaining }
+    : undefined;
+
+  return { studentProfile: student, membership: enrichedMembership };
+}
+
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   let token = '';
@@ -63,17 +133,15 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
     return next();
   }
 
-  let studentProfile: StudentProfile | undefined;
-  let membership: Membership | undefined;
-
-  if (user.role === 'student') {
-    const students = db.get('students');
-    studentProfile = students.find(s => s.userId === user.id);
-    if (studentProfile) {
-      const memberships = db.get('memberships');
-      membership = memberships.find(m => m.studentId === studentProfile!.id);
-    }
+  // Check login authorization
+  if (user.loginAccessGranted === false) {
+    return res.status(403).json({
+      error: 'Account access pending administrator authorization.',
+      accessDenied: true
+    });
   }
+
+  const { studentProfile, membership } = syncAndEnrichStudentSession(user);
 
   req.user = {
     userId: user.id,

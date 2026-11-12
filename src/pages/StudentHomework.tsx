@@ -38,7 +38,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const { studentProfile, membership, refreshProfile } = useAuth();
   const [homeworkList, setHomeworkList] = useState<Homework[]>([]);
   const [classes, setClasses] = useState<ClassLevel[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string>(studentProfile?.classId || 'all');
+  const [selectedClass, setSelectedClass] = useState<string>(studentProfile?.classId || '');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [loading, setLoading] = useState(true);
@@ -47,6 +47,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
   const [showPayModal, setShowPayModal] = useState(false);
   const [showProofModal, setShowProofModal] = useState(false);
   const [pendingPayment, setPendingPayment] = useState<any>(null);
+  const [rejectedPayment, setRejectedPayment] = useState<any>(null);
   const [accessValidity, setAccessValidity] = useState<any>(null);
   
   // Gallery viewer with multi-image previous/next navigation
@@ -67,7 +68,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
     setLoading(true);
     try {
       const [data, clsRes, statusRes] = await Promise.all([
-        apiFetch(`/api/homework${selectedClass !== 'all' ? `?classId=${selectedClass}` : ''}`),
+        apiFetch(`/api/homework`),
         apiFetch('/api/classes').catch(() => ({ classes: [] })),
         apiFetch('/api/payments/my-status').catch(() => null)
       ]);
@@ -81,6 +82,11 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
       } else {
         setPendingPayment(null);
       }
+      if (statusRes?.latestRejectedRequest) {
+        setRejectedPayment(statusRes.latestRejectedRequest);
+      } else {
+        setRejectedPayment(null);
+      }
       setMembershipExpired(false);
     } catch (err: any) {
       if (err.status === 403 && (err.data?.error === 'membership_expired' || err.data?.locked)) {
@@ -91,6 +97,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
           apiFetch('/api/payments/my-status')
             .then(res => {
               if (res?.pendingRequest) setPendingPayment(res.pendingRequest);
+              if (res?.latestRejectedRequest) setRejectedPayment(res.latestRejectedRequest);
             })
             .catch(() => {});
         }
@@ -104,7 +111,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
 
   useEffect(() => {
     fetchHomework();
-  }, [membership, selectedClass]);
+  }, [membership]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -279,59 +286,51 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
           </div>
         </div>
 
-        {/* Class Selection Tabs ("Har Homework Class Ke Hisab Se") */}
-        <div className="p-4 rounded-2xl bg-white/90 backdrop-blur-xl border border-blue-100 shadow-xs space-y-2 text-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <span className="text-slate-800 font-bold flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-blue-600" />
-              <span>Select Class to View Daily Homework ("Class Ke Hisab Se"):</span>
-            </span>
-            <span className="text-[11px] text-slate-500">
-              Active: <strong className="text-blue-700">{selectedClass === 'all' ? 'All Classes' : classes.find(c => c.id === selectedClass)?.name || selectedClass}</strong>
-            </span>
+        {/* Rejection Notification if Admin rejected previous submission */}
+        {rejectedPayment && (
+          <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-xs text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-rose-950">Previous Monthly Fee Submission Rejected</span>
+                <p className="text-rose-800 mt-0.5 leading-relaxed">
+                  Your submitted Payment ID / UTR (<strong className="font-mono">{rejectedPayment.utrNumber || 'N/A'}</strong>) was rejected by Admin.
+                  {rejectedPayment.adminRemarks ? ` Rejection Reason: "${rejectedPayment.adminRemarks}"` : ' Reason: Payment screenshot or UTR could not be verified.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowProofModal(true)}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shrink-0 transition-colors shadow-xs cursor-pointer"
+            >
+              Submit Fresh UTR & Proof
+            </button>
+          </div>
+        )}
+
+        {/* Assigned Class Banner (Enforced Class-Wise Authorization) */}
+        <div className="p-4 rounded-2xl bg-white/90 backdrop-blur-xl border border-blue-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0 border border-blue-200">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Assigned Class Curriculum
+              </div>
+              <div className="font-extrabold text-sm text-slate-900">
+                {studentProfile?.className || 'Assigned Class'} ({studentProfile?.batchName || 'Regular Batch'})
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button
-              onClick={() => setSelectedClass('all')}
-              className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedClass === 'all'
-                  ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/20'
-                  : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-white hover:text-blue-600 hover:border-blue-200'
-              }`}
-            >
-              <span>🎓 All Classes</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${selectedClass === 'all' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                {homeworkList.length}
-              </span>
-            </button>
-
-            {classes.map(c => {
-              const count = homeworkList.filter(h => h.classId === c.id).length;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedClass(c.id)}
-                  className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    selectedClass === c.id
-                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-600/20'
-                      : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-white hover:text-blue-600 hover:border-blue-200'
-                  }`}
-                >
-                  <span>{c.name}</span>
-                  {c.id === studentProfile?.classId && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-emerald-500 text-white">
-                      MY CLASS
-                    </span>
-                  )}
-                  {selectedClass === 'all' && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+              Class ID: {studentProfile?.classId || 'cls_10'}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[11px]">
+              {homeworkList.length} Active Homework Task{homeworkList.length === 1 ? '' : 's'}
+            </span>
           </div>
         </div>
 
@@ -385,21 +384,33 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                   <span>⏳ Payment Verification Pending (Admin Review Kar Rahe Hain)</span>
                 </div>
                 <p className="text-xs text-slate-700 leading-relaxed">
-                  Aapne Payment ID / UTR <strong className="font-mono text-blue-700 font-bold">{pendingPayment.utrNumber || pendingPayment.id}</strong> (₹{pendingPayment.amount}) submit kiya hua hai. Admin (AIHSAN ANSARI) dwara approve karte hi aapko <strong>30 din ka purna access</strong> mil jayega aur live timer chalu hoga.
+                  Aapne Payment ID / UTR <strong className="font-mono text-blue-700 font-bold">{pendingPayment.utrNumber || pendingPayment.id}</strong> (₹{pendingPayment.amount}) submit kiya hua hai. Admin (AIHSAN ANSARI) dwara approve karte hi aapko <strong>1 Calendar Month ka purna access</strong> mil jayega aur live timer chalu hoga.
                 </p>
                 <div className="text-[11px] text-amber-800 font-semibold pt-1">
                   Submitted at: {new Date(pendingPayment.createdAt).toLocaleString('en-IN')}
                 </div>
               </div>
+            ) : rejectedPayment ? (
+              <div className="p-4 sm:p-5 rounded-2xl bg-rose-50 border-2 border-rose-300 text-left space-y-2 max-w-xl mx-auto shadow-sm">
+                <div className="flex items-center gap-2 text-rose-900 font-bold text-xs sm:text-sm">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <span>Fee Payment Rejected by Admin</span>
+                </div>
+                <p className="text-xs text-rose-800 leading-relaxed">
+                  Previous UTR: <strong className="font-mono">{rejectedPayment.utrNumber}</strong>.<br />
+                  {rejectedPayment.adminRemarks ? `Reason: "${rejectedPayment.adminRemarks}". ` : ''}
+                  Please pay your tuition fee and submit the correct UTR with screenshot below.
+                </p>
+              </div>
             ) : (
               <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 max-w-xl mx-auto text-left text-xs space-y-1.5">
                 <div className="font-bold text-blue-900 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span>30 Din Ka Access Kaise Kholein?</span>
+                  <span>1 Month Access Kaise Kholein?</span>
                 </div>
                 <p className="text-slate-600">
-                  1. PhonePe / UPI par tuition fees transfer karein.<br />
-                  2. Neeche diye gaye button par click karke apna <strong>Payment ID / UTR</strong> submit karein.<br />
+                  1. PhonePe / UPI par monthly tuition fees transfer karein.<br />
+                  2. Neeche diye gaye button par click karke apna <strong>UTR number aur payment screenshot</strong> submit karein.<br />
                   3. Admin panel me notification aayegi aur Admin approve karte hi homework khul jayega!
                 </p>
               </div>
@@ -503,7 +514,7 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                       key={hw.id}
                       className="p-6 sm:p-7 rounded-3xl bg-white/90 backdrop-blur-xl border border-blue-100/90 shadow-[0_10px_30px_rgba(37,99,235,0.04)] space-y-5"
                     >
-                      {/* Top Bar of Card: Chapter Name, Class, Subject */}
+                      {/* Top Bar of Card: Chapter Name, Class, Subject, Deadline */}
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
                         <div>
                           <h3 className="text-lg font-black text-slate-900">
@@ -520,7 +531,39 @@ export const StudentHomework: React.FC<StudentHomeworkProps> = ({ onNavigate }) 
                           </div>
                         </div>
 
+                        {(hw.deadline || hw.deadlineDate) && (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 shrink-0">
+                            <Clock className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Due: {new Date(hw.deadline || hw.deadlineDate).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Instructions & Description */}
+                      {hw.instructions && (
+                        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 text-xs text-slate-800 space-y-1">
+                          <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Homework Tasks & Instructions:</span>
+                          </div>
+                          <div className="whitespace-pre-line leading-relaxed text-slate-700">
+                            {hw.instructions}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Aaj Class Mein Kya Padhaya (Teaching Summary) */}
+                      {hw.teachingSummary && (
+                        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950 space-y-1">
+                          <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Class Lecture Summary:</span>
+                          </div>
+                          <div className="whitespace-pre-line leading-relaxed text-amber-900">
+                            {hw.teachingSummary}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Attached Images (Multi-Image Gallery or Single High-Res Preview) */}
                       {(() => {

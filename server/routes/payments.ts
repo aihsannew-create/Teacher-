@@ -1,8 +1,10 @@
 import crypto from 'crypto';
-import { Router, Response } from 'express';
-import { db } from '../db';
-import { requireAuth, AuthenticatedRequest } from '../auth';
-import { PaymentTransaction, PaymentReceipt, Membership, StudentProfile, AppNotification, AuditLog } from '../types';
+import { Router } from 'express';
+import type { Response } from 'express';
+import { db } from '../db.ts';
+import { requireAuth, addOneCalendarMonth } from '../auth.ts';
+import type { AuthenticatedRequest } from '../auth.ts';
+import type { PaymentTransaction, PaymentReceipt, Membership, StudentProfile, AppNotification, AuditLog } from '../types.ts';
 
 const router = Router();
 
@@ -122,8 +124,7 @@ router.post('/verify', requireAuth, (req: AuthenticatedRequest, res: Response) =
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
-    // In production or test mock: allow if matches or if in designated test mode with signature simulation
-    const matchesSignature = generated === razorpay_signature || razorpay_signature.startsWith('sim_sig_');
+    const matchesSignature = generated === razorpay_signature;
     if (!matchesSignature) {
       return res.status(400).json({
         error: 'invalid_signature',
@@ -247,8 +248,8 @@ router.post('/verify', requireAuth, (req: AuthenticatedRequest, res: Response) =
 
 // 3. Teacher Records Offline Cash / Bank Payment Manually
 router.post('/record-offline', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (req.user?.role !== 'teacher') {
-    return res.status(403).json({ error: 'Only teacher can record offline payments.' });
+  if (req.user?.role !== 'teacher' && req.user?.role !== 'owner') {
+    return res.status(403).json({ error: 'Only teacher or admin can record offline payments.' });
   }
 
   const {
@@ -257,8 +258,7 @@ router.post('/record-offline', requireAuth, (req: AuthenticatedRequest, res: Res
     paymentMethod,
     transactionRef,
     teacherNotes,
-    billingMonth,
-    extendDays
+    billingMonth
   } = req.body;
 
   if (!studentId || !amount) {
@@ -278,35 +278,41 @@ router.post('/record-offline', requireAuth, (req: AuthenticatedRequest, res: Res
 
   const receiptNumber = generateReceiptNumber();
   const paymentId = `pay_off_${Date.now()}`;
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
 
-  // Extend membership
+  // Calculate 1 calendar month subscription
   const memberships = db.get('memberships');
   const memIndex = memberships.findIndex(m => m.studentId === student.id);
-  const currentExpiry = memIndex !== -1 ? memberships[memIndex].expiryDate : undefined;
+  const currentMem = memIndex !== -1 ? memberships[memIndex] : null;
 
-  const base = currentExpiry && new Date(currentExpiry).getTime() > Date.now()
-    ? new Date(currentExpiry)
-    : new Date();
-  base.setDate(base.getDate() + (Number(extendDays) || 30));
-  const newExpiry = base.toISOString().split('T')[0];
+  let baseDate = now;
+  if (currentMem && currentMem.expiryDate) {
+    const currentExpiryTime = new Date(currentMem.expiryDate).getTime();
+    if (!isNaN(currentExpiryTime) && currentExpiryTime > Date.now()) {
+      baseDate = new Date(currentExpiryTime);
+    }
+  }
+
+  const newExpiry = addOneCalendarMonth(baseDate).toISOString();
 
   if (memIndex !== -1) {
     memberships[memIndex] = {
       ...memberships[memIndex],
       status: 'active',
+      startDate: nowIso,
       expiryDate: newExpiry,
-      lastPaymentDate: nowIso.split('T')[0],
+      lastPaymentDate: nowIso,
       lastPaymentAmount: Number(amount)
     };
   } else {
     memberships.push({
       id: `mem_${Date.now()}`,
       studentId: student.id,
-      startDate: nowIso.split('T')[0],
+      startDate: nowIso,
       expiryDate: newExpiry,
       status: 'active',
-      lastPaymentDate: nowIso.split('T')[0],
+      lastPaymentDate: nowIso,
       lastPaymentAmount: Number(amount),
       autoRenew: false,
       gracePeriodDays: 3
@@ -515,12 +521,11 @@ router.post('/public-deposit', (req, res: Response) => {
 
   const students = db.get('students');
   const classes = db.get('classes');
-  const memberships = db.get('memberships');
-  const batches = db.get('batches');
   const settings = db.get('settings');
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
 
-  // Find or identify student
+  // Find existing student by studentId, rollNumber, or phone
   let student = studentId ? students.find(s => s.id === studentId) : undefined;
   if (!student && rollNumber) {
     student = students.find(s => s.rollNumber.toLowerCase() === String(rollNumber).trim().toLowerCase());
@@ -528,150 +533,73 @@ router.post('/public-deposit', (req, res: Response) => {
   if (!student && phone) {
     student = students.find(s => s.phone.replace(/[^0-9]/g, '') === String(phone).replace(/[^0-9]/g, ''));
   }
-
-  const selectedClass = classes.find(c => c.id === classId || c.name === className) || classes[0];
-  const matchedBatch = batches.find(b => b.classId === selectedClass?.id) || batches[0];
-
-  let effectiveStudentId = student ? student.id : `stu_quick_${Date.now()}`;
-  let effectiveRollNumber = student ? student.rollNumber : (rollNumber || `PRN-FEES-${Date.now().toString().slice(-4)}`);
-  let effectiveStudentName = student ? student.name : String(studentName).trim();
-  let effectiveClassName = student ? (classes.find(c => c.id === student?.classId)?.name || className) : (selectedClass?.name || className || 'Coaching Class');
-
-  // If new walk-in student, create a lightweight student record
-  if (!student) {
-    const newStudent: StudentProfile = {
-      id: effectiveStudentId,
-      userId: `usr_quick_${Date.now()}`,
-      name: effectiveStudentName,
-      rollNumber: effectiveRollNumber,
-      phone: phone || '',
-      email: `${effectiveRollNumber.toLowerCase()}@tuition.local`,
-      classId: selectedClass?.id || 'cls_10',
-      batchId: matchedBatch?.id || 'btc_10_morn',
-      status: 'active',
-      enrollmentDate: nowIso.split('T')[0],
-      guardianName: 'Guardian',
-      guardianPhone: phone || '',
-      guardianRelation: 'Parent',
-      customFee: feeAmount
-    };
-    db.set('students', [newStudent, ...students]);
-  } else {
-    // Ensure existing student is active
-    const sIdx = students.findIndex(s => s.id === student!.id);
-    if (sIdx !== -1) {
-      students[sIdx].status = 'active';
-      db.set('students', students);
-    }
+  if (!student && studentName) {
+    student = students.find(s => s.name.trim().toLowerCase() === String(studentName).trim().toLowerCase());
   }
 
-  // Extend or create membership
-  const memIndex = memberships.findIndex(m => m.studentId === effectiveStudentId);
-  const currentExpiry = memIndex !== -1 ? memberships[memIndex].expiryDate : undefined;
-  const newExpiry = getExtendedExpiryDate(currentExpiry);
-
-  if (memIndex !== -1) {
-    memberships[memIndex] = {
-      ...memberships[memIndex],
-      status: 'active',
-      expiryDate: newExpiry,
-      lastPaymentDate: nowIso.split('T')[0],
-      lastPaymentAmount: feeAmount
-    };
-  } else {
-    memberships.push({
-      id: `mem_${Date.now()}`,
-      studentId: effectiveStudentId,
-      startDate: nowIso.split('T')[0],
-      expiryDate: newExpiry,
-      status: 'active',
-      lastPaymentDate: nowIso.split('T')[0],
-      lastPaymentAmount: feeAmount,
-      autoRenew: false,
-      gracePeriodDays: 3
+  if (!student) {
+    return res.status(404).json({
+      error: 'Student account not found. Please provide a valid enrolled Student ID (Roll No) or phone number. New admissions must first be registered by the Institute Admin.'
     });
   }
-  db.set('memberships', memberships);
 
-  const receiptNumber = generateReceiptNumber();
-  const paymentId = `pay_quick_${Date.now()}`;
-  const effectiveMonth = billingMonth || new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const selectedClass = classes.find(c => c.id === student!.classId) || classes[0];
+  const effectiveMonth = billingMonth || now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
   const effectiveMethod = paymentMethod || 'upi';
-  const effectiveTxnRef = transactionRef || (effectiveMethod === 'cash' ? `CASH-${receiptNumber}` : `UPI-${Date.now().toString().slice(-6)}`);
+  const effectiveTxnRef = String(transactionRef || '').trim();
 
-  // Record payment transaction
+  if (!effectiveTxnRef) {
+    return res.status(400).json({ error: 'UPI Transaction ID / UTR number is required for fee verification.' });
+  }
+
+  // Check if already submitted
+  const payments = db.get('payments');
+  const alreadyApproved = payments.find(p => p.utrNumber === effectiveTxnRef && p.status === 'success');
+  if (alreadyApproved) {
+    return res.status(400).json({ error: 'This UTR / Transaction ID has already been verified and credited previously.' });
+  }
+
+  const paymentId = `pay_proof_${Date.now()}`;
+
+  // Create pending verification payment record (NEVER auto-activate membership)
   const newPayment: PaymentTransaction = {
     id: paymentId,
-    studentId: effectiveStudentId,
-    studentName: effectiveStudentName,
-    rollNumber: effectiveRollNumber,
-    classId: selectedClass?.id || 'cls_10',
+    studentId: student.id,
+    studentName: student.name,
+    rollNumber: student.rollNumber,
+    classId: student.classId,
     amount: feeAmount,
-    periodStart: nowIso.split('T')[0],
-    periodEnd: newExpiry,
-    status: 'success',
+    periodStart: nowIso,
+    periodEnd: '', // set upon admin approval
+    status: 'pending',
     paymentMethod: effectiveMethod,
-    receiptNumber,
-    teacherNotes: notes || `Direct fee deposit via floating portal (${effectiveMethod.toUpperCase()})`,
+    utrNumber: effectiveTxnRef,
+    screenshotUrl: req.body.screenshotUrl || '',
+    teacherNotes: notes || `Direct fee submission with UTR ${effectiveTxnRef}. Awaiting Admin Approval.`,
     createdAt: nowIso
   };
-  db.set('payments', [newPayment, ...db.get('payments')]);
 
-  // Record payment receipt
-  const newReceipt: PaymentReceipt = {
-    receiptNumber,
-    paymentId,
-    studentId: effectiveStudentId,
-    studentName: effectiveStudentName,
-    rollNumber: effectiveRollNumber,
-    className: effectiveClassName,
-    batchName: matchedBatch?.name || 'General Batch',
-    billingMonth: effectiveMonth,
-    amount: feeAmount,
-    paymentMethod: effectiveMethod,
-    transactionId: effectiveTxnRef,
-    paidAt: nowIso,
-    receiptDate: nowIso.split('T')[0],
-    teacherNotes: notes || `Quick deposit verified. Validity extended until ${newExpiry}`
-  };
-  db.set('receipts', [newReceipt, ...db.get('receipts')]);
+  db.set('payments', [newPayment, ...payments]);
 
-  // Record notification for the student
+  // Dispatch real-time in-app notification to Teacher and Owner
   const notifs = db.get('notifications');
-  db.set('notifications', [
-    {
-      id: `notif_${Date.now()}`,
-      recipientId: effectiveStudentId,
-      title: 'Fee Payment Received',
-      message: `Tuition fee of Rs ${feeAmount} deposited for ${effectiveMonth}. Receipt #${receiptNumber} generated. Validity: ${newExpiry}.`,
-      type: 'payment_success',
-      read: false,
-      createdAt: nowIso,
-      actionUrl: `/receipt/${receiptNumber}`
-    },
-    ...notifs
-  ]);
-
-  // Record audit log
-  const auditLogs = db.get('auditLogs');
-  db.set('auditLogs', [
-    {
-      id: `audit_${Date.now()}`,
-      userId: effectiveStudentId,
-      userName: effectiveStudentName,
-      action: 'PUBLIC_FEE_DEPOSIT',
-      details: `Fee deposit of Rs ${feeAmount} (${effectiveMethod}) for ${effectiveStudentName} (${effectiveRollNumber}). Receipt #${receiptNumber}. Validity: ${newExpiry}.`,
-      timestamp: nowIso
-    },
-    ...auditLogs
-  ]);
+  const notifAdmin: AppNotification = {
+    id: `notif_${Date.now()}_req`,
+    recipientId: 'owner',
+    title: `🔔 Fee Verification Request: ${student.name}`,
+    message: `${student.name} (${student.rollNumber}) ne Rs ${feeAmount} ka UPI UTR (${effectiveTxnRef}) submit kiya hai. Kripya verify karke 1 Calendar Month access approve karein.`,
+    type: 'payment_submitted',
+    read: false,
+    createdAt: nowIso,
+    actionUrl: '/owner-access'
+  };
+  db.set('notifications', [notifAdmin, ...notifs]);
 
   return res.status(201).json({
     success: true,
-    message: `Fee of Rs ${feeAmount} submitted successfully! Official Receipt #${receiptNumber} generated.`,
-    receipt: newReceipt,
-    payment: newPayment,
-    newExpiryDate: newExpiry
+    pendingApproval: true,
+    message: `Payment proof with UTR "${effectiveTxnRef}" has been submitted for Admin verification. Your 1-calendar-month subscription will be activated upon Admin approval.`,
+    payment: newPayment
   });
 });
 
@@ -698,13 +626,18 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
     return res.status(403).json({ error: 'Student record not found.' });
   }
 
-  const { transactionId, amount, paymentMethod, screenshotUrl, notes } = req.body;
+  const { amount, paymentMethod, screenshotUrl, notes } = req.body;
+  const rawTxn = (req.body.transactionId || req.body.utrNumber || req.body.transactionRef || '').toString();
 
-  if (!transactionId || !String(transactionId).trim()) {
-    return res.status(400).json({ error: 'Payment Transaction ID / UTR number is required.' });
+  if (!rawTxn.trim()) {
+    return res.status(400).json({ error: 'UPI Transaction ID / UTR number is required.' });
   }
 
-  const cleanTxnId = String(transactionId).trim();
+  if (!screenshotUrl || !String(screenshotUrl).trim()) {
+    return res.status(400).json({ error: 'Payment screenshot is required for fee verification.' });
+  }
+
+  const cleanTxnId = String(rawTxn).trim();
   const classes = db.get('classes');
   const studentClass = classes.find(c => c.id === student.classId);
   const feeAmount = Number(amount) || student.customFee || studentClass?.monthlyFee || 2500;
@@ -724,7 +657,7 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
     });
   }
 
-  // Create pending verification payment record
+  // Create pending verification payment record (Never activates membership on submission)
   const newPayment: PaymentTransaction = {
     id: paymentId,
     studentId: student.id,
@@ -735,9 +668,9 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
     periodStart: nowIso,
     periodEnd: '', // set upon admin approval
     status: 'pending',
-    paymentMethod: paymentMethod || 'phonepe',
+    paymentMethod: paymentMethod || 'upi',
     utrNumber: cleanTxnId,
-    screenshotUrl: screenshotUrl || '',
+    screenshotUrl: String(screenshotUrl).trim(),
     teacherNotes: notes || `Student submitted Payment ID / UTR: ${cleanTxnId}`,
     createdAt: nowIso
   };
@@ -750,7 +683,7 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
     id: `notif_${Date.now()}_t`,
     recipientId: 'teacher',
     title: `🔔 Fee Verification Request: ${student.name}`,
-    message: `${student.name} (${student.rollNumber}) ne Rs ${feeAmount} ka Payment ID / UTR (${cleanTxnId}) submit kiya hai. Kripya verify karke 30 din ka access approve karein.`,
+    message: `${student.name} (${student.rollNumber}) ne Rs ${feeAmount} ka UPI UTR (${cleanTxnId}) screenshot ke sath submit kiya hai. Kripya verify karein.`,
     type: 'payment_submitted',
     read: false,
     createdAt: nowIso,
@@ -761,7 +694,7 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
     id: `notif_${Date.now()}_o`,
     recipientId: 'owner',
     title: `🔔 Fee Verification Request: ${student.name}`,
-    message: `${student.name} (${student.rollNumber}) ne Rs ${feeAmount} ka Payment ID / UTR (${cleanTxnId}) submit kiya hai. Kripya verify karke 30 din ka access approve karein.`,
+    message: `${student.name} (${student.rollNumber}) ne Rs ${feeAmount} ka UPI UTR (${cleanTxnId}) screenshot ke sath submit kiya hai. Kripya verify karein.`,
     type: 'payment_submitted',
     read: false,
     createdAt: nowIso,
@@ -786,12 +719,12 @@ router.post('/submit-proof', requireAuth, (req: AuthenticatedRequest, res: Respo
 
   return res.status(201).json({
     success: true,
-    message: `Payment ID "${cleanTxnId}" safaltapurvak Admin ko bhej diya gaya hai. Admin dwara verify hote hi 30 din ka homework access activate ho jayega.`,
+    message: `Payment ID "${cleanTxnId}" with screenshot has been submitted to Admin. Your 1-calendar-month access will activate once the Admin approves.`,
     payment: newPayment
   });
 });
 
-// 10. Admin / Teacher Retrieves All Pending Payment Verification Requests
+// 10. Admin / Teacher Retrieves All Pending and Historical Payment Verification Requests
 router.get('/pending-requests', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   if (user.role !== 'teacher' && user.role !== 'owner') {
@@ -800,40 +733,48 @@ router.get('/pending-requests', requireAuth, (req: AuthenticatedRequest, res: Re
 
   const payments = db.get('payments');
   const students = db.get('students');
+  const users = db.get('users');
   const classes = db.get('classes');
   const batches = db.get('batches');
   const memberships = db.get('memberships');
 
-  const pendingList = payments
-    .filter(p => p.status === 'pending')
-    .map(p => {
-      const stu = students.find(s => s.id === p.studentId);
-      const cls = classes.find(c => c.id === (stu?.classId || p.classId));
-      const bth = batches.find(b => b.id === stu?.batchId);
-      const mem = memberships.find(m => m.studentId === p.studentId);
+  const allRequests = payments.map(p => {
+    const stu = students.find(s => s.id === p.studentId);
+    const userAcc = stu ? users.find(u => u.id === stu.userId) : undefined;
+    const cls = classes.find(c => c.id === (p.classId || stu?.classId));
+    const bth = batches.find(b => b.id === stu?.batchId);
+    const mem = memberships.find(m => m.studentId === p.studentId);
 
-      const isCurrentExpired = !mem || new Date(mem.expiryDate).getTime() <= Date.now();
+    const isCurrentExpired = !mem || new Date(mem.expiryDate).getTime() <= Date.now();
 
-      return {
-        ...p,
-        studentPhone: stu?.phone || '',
-        guardianPhone: stu?.guardianPhone || '',
-        guardianName: stu?.guardianName || '',
-        className: cls?.name || 'Class',
-        batchName: bth?.name || 'Batch',
-        currentMembershipStatus: mem?.status || 'expired',
-        currentExpiryDate: mem?.expiryDate || '',
-        isCurrentExpired
-      };
-    });
+    return {
+      ...p,
+      studentName: stu?.name || p.studentName,
+      rollNumber: stu?.rollNumber || p.rollNumber || 'N/A',
+      studentEmail: userAcc?.email || stu?.email || '',
+      studentPhone: stu?.phone || userAcc?.phone || '',
+      guardianPhone: stu?.guardianPhone || '',
+      guardianName: stu?.guardianName || '',
+      className: cls?.name || 'Class',
+      classId: cls?.id || stu?.classId || p.classId,
+      batchName: bth?.name || 'Batch',
+      currentMembershipStatus: mem?.status || 'expired',
+      currentExpiryDate: mem?.expiryDate || '',
+      currentStartDate: mem?.startDate || '',
+      isCurrentExpired
+    };
+  });
+
+  const pendingRequests = allRequests.filter(p => p.status === 'pending');
 
   return res.json({
-    pendingRequests: pendingList,
-    totalPending: pendingList.length
+    pendingRequests,
+    allRequests,
+    totalPending: pendingRequests.length
   });
 });
 
-// 11. Admin / Teacher Approves Payment & Grants 30 Days Access
+// 11. Admin / Teacher Approves Payment & Activates Subscription for Exactly One Calendar Month
 router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   if (user.role !== 'teacher' && user.role !== 'owner') {
@@ -841,8 +782,7 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
   }
 
   const { id } = req.params;
-  const { accessDays = 30, adminRemarks } = req.body;
-  const daysToGrant = Number(accessDays) || 30;
+  const { adminRemarks } = req.body;
 
   const payments = db.get('payments');
   const pIndex = payments.findIndex(p => p.id === id);
@@ -852,6 +792,10 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
   }
 
   const payment = payments[pIndex];
+  if (payment.status === 'success') {
+    return res.status(400).json({ error: 'This payment request has already been approved.' });
+  }
+
   const students = db.get('students');
   const student = students.find(s => s.id === payment.studentId);
 
@@ -859,23 +803,11 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
     return res.status(404).json({ error: 'Student profile associated with this payment was not found.' });
   }
 
-  const now = new Date();
-  const nowIso = now.toISOString();
+  // Exact 1 calendar month calculation from approval time
+  const approvalTime = new Date();
+  const startDate = approvalTime.toISOString();
+  const expiryDate = addOneCalendarMonth(approvalTime).toISOString();
 
-  // Calculate new exact expiration timestamp (30 days from now, or extends if still active)
-  const memberships = db.get('memberships');
-  const memIndex = memberships.findIndex(m => m.studentId === student.id);
-  const currentMem = memIndex !== -1 ? memberships[memIndex] : null;
-
-  let baseTime = Date.now();
-  if (currentMem && currentMem.expiryDate) {
-    const currentExpiryTime = new Date(currentMem.expiryDate).getTime();
-    if (!isNaN(currentExpiryTime) && currentExpiryTime > Date.now()) {
-      baseTime = currentExpiryTime; // Extend on top of existing remaining time
-    }
-  }
-
-  const newExpiryDate = new Date(baseTime + daysToGrant * 24 * 60 * 60 * 1000).toISOString();
   const receiptNumber = generateReceiptNumber();
 
   // 1. Update Payment Transaction
@@ -883,38 +815,41 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
     ...payment,
     status: 'success',
     receiptNumber,
-    periodStart: nowIso,
-    periodEnd: newExpiryDate,
-    approvedBy: user.name || (user.role === 'owner' ? 'Institute Owner (AIHSAN ANSARI)' : 'Teacher'),
-    approvedAt: nowIso,
-    accessGrantedDays: daysToGrant,
-    adminRemarks: adminRemarks || `Approved by ${user.name || user.role}. ${daysToGrant} Days full homework access granted.`
+    periodStart: startDate,
+    periodEnd: expiryDate,
+    approvedBy: user.name || (user.role === 'owner' ? 'Institute Owner (AIHSAN ANSARI)' : 'Teacher Admin'),
+    approvedAt: startDate,
+    accessGrantedDays: 30,
+    adminRemarks: adminRemarks || `Approved by ${user.name || user.role}. Exactly 1 calendar month active subscription granted until ${new Date(expiryDate).toLocaleDateString('en-IN')}.`
   };
   db.set('payments', payments);
 
-  // 2. Update Membership
+  // 2. Update Student Membership (Save exact startDate and expiryDate)
+  const memberships = db.get('memberships');
+  const memIndex = memberships.findIndex(m => m.studentId === student.id);
+
   if (memIndex !== -1) {
     memberships[memIndex] = {
       ...memberships[memIndex],
       status: 'active',
-      startDate: nowIso,
-      expiryDate: newExpiryDate,
-      lastPaymentDate: nowIso,
+      startDate: startDate,
+      expiryDate: expiryDate,
+      lastPaymentDate: startDate,
       lastPaymentAmount: payment.amount,
-      accessDurationDays: daysToGrant
+      accessDurationDays: 30
     };
   } else {
     memberships.push({
       id: `mem_${Date.now()}`,
       studentId: student.id,
-      startDate: nowIso,
-      expiryDate: newExpiryDate,
+      startDate: startDate,
+      expiryDate: expiryDate,
       status: 'active',
-      lastPaymentDate: nowIso,
+      lastPaymentDate: startDate,
       lastPaymentAmount: payment.amount,
       autoRenew: false,
       gracePeriodDays: 3,
-      accessDurationDays: daysToGrant
+      accessDurationDays: 30
     });
   }
   db.set('memberships', memberships);
@@ -927,12 +862,20 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
     db.set('students', students);
   }
 
+  // Also enable user account if it was pending
+  const users = db.get('users');
+  const uIndex = users.findIndex(u => u.id === student.userId);
+  if (uIndex !== -1) {
+    users[uIndex].loginAccessGranted = true;
+    db.set('users', users);
+  }
+
   // 4. Generate Official Receipt
   const classes = db.get('classes');
   const batches = db.get('batches');
   const studentClass = classes.find(c => c.id === student.classId);
   const studentBatch = batches.find(b => b.id === student.batchId);
-  const monthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const monthName = approvalTime.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const newReceipt: PaymentReceipt = {
     receiptNumber,
@@ -946,30 +889,28 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
     amount: payment.amount,
     paymentMethod: payment.paymentMethod,
     transactionId: payment.utrNumber || payment.id,
-    paidAt: nowIso,
-    receiptDate: nowIso.split('T')[0],
-    teacherNotes: `Verified & Approved by Admin. Granted ${daysToGrant} Days access until ${new Date(newExpiryDate).toLocaleDateString('en-IN')}`
+    paidAt: startDate,
+    receiptDate: startDate.split('T')[0],
+    teacherNotes: `Verified & Approved by Admin. Active for 1 calendar month until ${new Date(expiryDate).toLocaleDateString('en-IN')}`
   };
   db.set('receipts', [newReceipt, ...db.get('receipts')]);
 
   // 5. Notify Student in-app
   const notifs = db.get('notifications');
-  const expiryFormatted = new Date(newExpiryDate).toLocaleDateString('en-IN', {
+  const expiryFormatted = new Date(expiryDate).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    year: 'numeric'
   });
 
   const studentNotif: AppNotification = {
     id: `notif_${Date.now()}_st`,
     recipientId: student.id,
-    title: `🎉 30 Din Ka Homework Access Shuru!`,
-    message: `Aapka Payment ID (${payment.utrNumber || payment.id}) Admin dwara verify kar liya gaya hai. Aapko agle ${daysToGrant} din (${expiryFormatted} tak) ka purna homework access de diya gaya hai. Receipt #${receiptNumber}.`,
+    title: `🎉 Monthly Fee Approved - Subscription Active!`,
+    message: `Your payment (UTR: ${payment.utrNumber || payment.id}) has been approved by the Admin. Your subscription is activated for 1 calendar month until ${expiryFormatted}. Receipt #${receiptNumber}.`,
     type: 'payment_success',
     read: false,
-    createdAt: nowIso,
+    createdAt: startDate,
     actionUrl: `/receipt/${receiptNumber}`
   };
   db.set('notifications', [studentNotif, ...notifs]);
@@ -982,22 +923,23 @@ router.post('/approve-request/:id', requireAuth, (req: AuthenticatedRequest, res
       userId: user.userId,
       userName: user.name,
       action: 'APPROVE_PAYMENT_GRANT_ACCESS',
-      details: `Approved Payment ID ${payment.utrNumber || payment.id} for ${student.name} (${student.rollNumber}). Granted ${daysToGrant} days access until ${newExpiryDate}. Receipt #${receiptNumber}.`,
-      timestamp: nowIso
+      details: `Approved Payment ID ${payment.utrNumber || payment.id} for ${student.name} (${student.rollNumber}). Activated 1 calendar month until ${expiryDate}. Receipt #${receiptNumber}.`,
+      timestamp: startDate
     },
     ...auditLogs
   ]);
 
   return res.json({
     success: true,
-    message: `Payment verified! Student ${student.name} ko ${daysToGrant} din ka homework access pradan kar diya gaya hai.`,
+    message: `Payment verified and approved! Student ${student.name} subscription activated for exactly 1 calendar month until ${expiryFormatted}.`,
     receipt: newReceipt,
-    newExpiryDate,
-    accessDurationDays: daysToGrant
+    startDate,
+    expiryDate,
+    newExpiryDate: expiryDate
   });
 });
 
-// 12. Admin / Teacher Rejects Invalid Payment Request
+// 12. Admin / Teacher Rejects Payment Request with Optional Reason
 router.post('/reject-request/:id', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   if (user.role !== 'teacher' && user.role !== 'owner') {
@@ -1005,7 +947,8 @@ router.post('/reject-request/:id', requireAuth, (req: AuthenticatedRequest, res:
   }
 
   const { id } = req.params;
-  const { reason = 'Payment transaction could not be verified in tuition bank account.' } = req.body;
+  const { reason = '' } = req.body;
+  const cleanReason = String(reason || '').trim();
 
   const payments = db.get('payments');
   const pIndex = payments.findIndex(p => p.id === id);
@@ -1020,9 +963,9 @@ router.post('/reject-request/:id', requireAuth, (req: AuthenticatedRequest, res:
   payments[pIndex] = {
     ...payment,
     status: 'rejected',
-    approvedBy: user.name,
+    approvedBy: user.name || (user.role === 'owner' ? 'Institute Owner' : 'Teacher'),
     approvedAt: nowIso,
-    adminRemarks: reason
+    adminRemarks: cleanReason || 'Payment transaction could not be verified in tuition bank account.'
   };
   db.set('payments', payments);
 
@@ -1031,8 +974,8 @@ router.post('/reject-request/:id', requireAuth, (req: AuthenticatedRequest, res:
   const studentNotif: AppNotification = {
     id: `notif_${Date.now()}_rej`,
     recipientId: payment.studentId,
-    title: `⚠️ Payment ID Verification Asafal`,
-    message: `Aapka Payment ID (${payment.utrNumber || payment.id}) verify nahi ho saka. Karan: ${reason}. Kripya sahi UTR submit karein ya teacher cabin se sampark karein.`,
+    title: `⚠️ Payment Verification Rejected`,
+    message: `Your payment request (UTR: ${payment.utrNumber || payment.id}) was rejected by Admin.${cleanReason ? ` Reason: ${cleanReason}.` : ''} Please verify your transaction ID/screenshot and submit a renewal request.`,
     type: 'fee_due',
     read: false,
     createdAt: nowIso
@@ -1046,7 +989,7 @@ router.post('/reject-request/:id', requireAuth, (req: AuthenticatedRequest, res:
   });
 });
 
-// 13. Student Checks Real-Time 30-Day Access & Countdown Status
+// 13. Student Checks Real-Time 1-Month Access & Countdown Status
 router.get('/my-status', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   const student = user.studentProfile;
@@ -1062,11 +1005,16 @@ router.get('/my-status', requireAuth, (req: AuthenticatedRequest, res: Response)
 
   const now = Date.now();
   const expiryTime = mem?.expiryDate ? new Date(mem.expiryDate).getTime() : 0;
-  const isExpired = !mem || isNaN(expiryTime) || now >= expiryTime;
+  const isExpired = !mem || isNaN(expiryTime) || now >= expiryTime || mem.status !== 'active';
   const timeRemainingMs = isExpired ? 0 : Math.max(0, expiryTime - now);
 
   const pendingRequest = payments.find(p => p.studentId === student.id && p.status === 'pending');
   const latestReceipt = receipts.find(r => r.studentId === student.id);
+
+  // Check latest rejected request so student can view rejection reason and renew
+  const latestRejectedRequest = payments
+    .filter(p => p.studentId === student.id && p.status === 'rejected')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] || null;
 
   const classes = db.get('classes');
   const studentClass = classes.find(c => c.id === student.classId);
@@ -1083,6 +1031,7 @@ router.get('/my-status', requireAuth, (req: AuthenticatedRequest, res: Response)
     expiryDate: mem?.expiryDate || null,
     startDate: mem?.startDate || null,
     pendingRequest: pendingRequest || null,
+    latestRejectedRequest,
     latestReceipt: latestReceipt || null
   });
 });

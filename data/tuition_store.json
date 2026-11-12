@@ -112,9 +112,12 @@
       "guardianPhone": "9822099800",
       "guardianRelation": "Mother",
       "enrollmentDate": "2026-09-10",
-      "status": "expired",
+      "status": "active",
       "notes": "Fee reminder sent to mother on 18th Oct. Cash promised this weekend.",
-      "loginAccessGranted": true
+      "loginAccessGranted": true,
+      "className": "Class 10 (Board Excellence)",
+      "batchName": "Regular Batch",
+      "monthlyFee": 2500
     },
     {
       "id": "stu_ananya",
@@ -522,13 +525,14 @@
     {
       "id": "mem_priya",
       "studentId": "stu_priya",
-      "startDate": "2026-09-10",
-      "expiryDate": "2026-10-10",
-      "status": "expired",
-      "lastPaymentDate": "2026-09-10",
+      "startDate": "2026-10-25T19:51:19.632Z",
+      "expiryDate": "2026-11-25T19:51:19.632Z",
+      "status": "active",
+      "lastPaymentDate": "2026-10-25T19:51:19.632Z",
       "lastPaymentAmount": 2500,
       "autoRenew": false,
-      "gracePeriodDays": 3
+      "gracePeriodDays": 3,
+      "accessDurationDays": 30
     },
     {
       "id": "mem_ananya",
@@ -543,6 +547,46 @@
     }
   ],
   "payments": [
+    {
+      "id": "pay_proof_1792957879625",
+      "studentId": "stu_priya",
+      "studentName": "Priya Deshmukh",
+      "rollNumber": "PTA-10-02",
+      "classId": "cls_10",
+      "amount": 2500,
+      "periodStart": "2026-10-25T19:51:19.632Z",
+      "periodEnd": "2026-11-25T19:51:19.632Z",
+      "status": "success",
+      "paymentMethod": "upi",
+      "utrNumber": "UPI9998887776",
+      "screenshotUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "teacherNotes": "Student submitted Payment ID / UTR: UPI9998887776",
+      "createdAt": "2026-10-25T19:51:19.625Z",
+      "receiptNumber": "RCP-2026-0004",
+      "approvedBy": "AIHSAN ANSARI",
+      "approvedAt": "2026-10-25T19:51:19.632Z",
+      "accessGrantedDays": 30,
+      "adminRemarks": "Approved by AIHSAN ANSARI. Exactly 1 calendar month active subscription granted until 25/11/2026."
+    },
+    {
+      "id": "pay_proof_1792957879607",
+      "studentId": "stu_priya",
+      "studentName": "Priya Deshmukh",
+      "rollNumber": "PTA-10-02",
+      "classId": "cls_10",
+      "amount": 2500,
+      "periodStart": "2026-10-25T19:51:19.607Z",
+      "periodEnd": "",
+      "status": "rejected",
+      "paymentMethod": "upi",
+      "utrNumber": "UPI7896541230",
+      "screenshotUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "teacherNotes": "Student submitted Payment ID / UTR: UPI7896541230",
+      "createdAt": "2026-10-25T19:51:19.607Z",
+      "approvedBy": "AIHSAN ANSARI",
+      "approvedAt": "2026-10-25T19:51:19.619Z",
+      "adminRemarks": "Screenshot is blurry, please provide clear UTR transaction details"
+    },
     {
       "id": "pay_aarav_oct",
       "studentId": "stu_aarav",
@@ -591,6 +635,22 @@
     }
   ],
   "receipts": [
+    {
+      "receiptNumber": "RCP-2026-0004",
+      "paymentId": "pay_proof_1792957879625",
+      "studentId": "stu_priya",
+      "studentName": "Priya Deshmukh",
+      "rollNumber": "PTA-10-02",
+      "className": "Class 10 (Board Excellence)",
+      "batchName": "Batch 10-B (Evening 5:30 PM - 7:00 PM)",
+      "billingMonth": "October 2026",
+      "amount": 2500,
+      "paymentMethod": "upi",
+      "transactionId": "UPI9998887776",
+      "paidAt": "2026-10-25T19:51:19.632Z",
+      "receiptDate": "2026-10-25",
+      "teacherNotes": "Verified & Approved by Admin. Active for 1 calendar month until 25/11/2026"
+    },
     {
       "receiptNumber": "RCP-2026-0012",
       "paymentId": "pay_aarav_oct",
@@ -641,6 +701,74 @@
     }
   ],
   "notifications": [
+    {
+      "id": "notif_1792957879678",
+      "recipientId": "class:cls_10",
+      "title": "New Homework: Science (Physics) (Light - Reflection and Refraction Test)",
+      "message": "Daily homework posted for Class 10 (Board Excellence). Topic: Light - Reflection and Refraction Test. Deadline: 27/10/2026",
+      "type": "homework",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.678Z"
+    },
+    {
+      "id": "notif_1792957879667_st",
+      "recipientId": "stu_priya",
+      "title": "🎉 Monthly Fee Approved - Subscription Active!",
+      "message": "Your payment (UTR: UPI9998887776) has been approved by the Admin. Your subscription is activated for 1 calendar month until 25 Nov 2026. Receipt #RCP-2026-0004.",
+      "type": "payment_success",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.632Z",
+      "actionUrl": "/receipt/RCP-2026-0004"
+    },
+    {
+      "id": "notif_1792957879625_t",
+      "recipientId": "teacher",
+      "title": "🔔 Fee Verification Request: Priya Deshmukh",
+      "message": "Priya Deshmukh (PTA-10-02) ne Rs 2500 ka UPI UTR (UPI9998887776) screenshot ke sath submit kiya hai. Kripya verify karein.",
+      "type": "payment_submitted",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.625Z",
+      "actionUrl": "/teacher-payments"
+    },
+    {
+      "id": "notif_1792957879626_o",
+      "recipientId": "owner",
+      "title": "🔔 Fee Verification Request: Priya Deshmukh",
+      "message": "Priya Deshmukh (PTA-10-02) ne Rs 2500 ka UPI UTR (UPI9998887776) screenshot ke sath submit kiya hai. Kripya verify karein.",
+      "type": "payment_submitted",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.625Z",
+      "actionUrl": "/owner-access"
+    },
+    {
+      "id": "notif_1792957879619_rej",
+      "recipientId": "stu_priya",
+      "title": "⚠️ Payment Verification Rejected",
+      "message": "Your payment request (UTR: UPI7896541230) was rejected by Admin. Reason: Screenshot is blurry, please provide clear UTR transaction details. Please verify your transaction ID/screenshot and submit a renewal request.",
+      "type": "fee_due",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.619Z"
+    },
+    {
+      "id": "notif_1792957879608_t",
+      "recipientId": "teacher",
+      "title": "🔔 Fee Verification Request: Priya Deshmukh",
+      "message": "Priya Deshmukh (PTA-10-02) ne Rs 2500 ka UPI UTR (UPI7896541230) screenshot ke sath submit kiya hai. Kripya verify karein.",
+      "type": "payment_submitted",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.607Z",
+      "actionUrl": "/teacher-payments"
+    },
+    {
+      "id": "notif_1792957879608_o",
+      "recipientId": "owner",
+      "title": "🔔 Fee Verification Request: Priya Deshmukh",
+      "message": "Priya Deshmukh (PTA-10-02) ne Rs 2500 ka UPI UTR (UPI7896541230) screenshot ke sath submit kiya hai. Kripya verify karein.",
+      "type": "payment_submitted",
+      "read": false,
+      "createdAt": "2026-10-25T19:51:19.607Z",
+      "actionUrl": "/owner-access"
+    },
     {
       "id": "notif_1792947343072",
       "recipientId": "teacher",
@@ -828,6 +956,30 @@
     }
   },
   "auditLogs": [
+    {
+      "id": "audit_1792957879668",
+      "userId": "usr_owner_01",
+      "userName": "AIHSAN ANSARI",
+      "action": "APPROVE_PAYMENT_GRANT_ACCESS",
+      "details": "Approved Payment ID UPI9998887776 for Priya Deshmukh (PTA-10-02). Activated 1 calendar month until 2026-11-25T19:51:19.632Z. Receipt #RCP-2026-0004.",
+      "timestamp": "2026-10-25T19:51:19.632Z"
+    },
+    {
+      "id": "audit_1792957879626",
+      "userId": "stu_priya",
+      "userName": "Priya Deshmukh",
+      "action": "PAYMENT_PROOF_SUBMITTED",
+      "details": "Student Priya Deshmukh (PTA-10-02) submitted payment proof UTR: UPI9998887776 for Rs 2500. Pending admin approval.",
+      "timestamp": "2026-10-25T19:51:19.625Z"
+    },
+    {
+      "id": "audit_1792957879608",
+      "userId": "stu_priya",
+      "userName": "Priya Deshmukh",
+      "action": "PAYMENT_PROOF_SUBMITTED",
+      "details": "Student Priya Deshmukh (PTA-10-02) submitted payment proof UTR: UPI7896541230 for Rs 2500. Pending admin approval.",
+      "timestamp": "2026-10-25T19:51:19.607Z"
+    },
     {
       "id": "audit_01",
       "userId": "usr_teacher_01",

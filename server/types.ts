@@ -38,6 +38,9 @@ export interface StudentProfile {
   rollNumber: string;
   classId: string;
   batchId: string;
+  className?: string;
+  batchName?: string;
+  monthlyFee?: number;
   guardianName: string;
   guardianPhone: string;
   guardianRelation: string;
@@ -57,6 +60,7 @@ export interface ClassLevel {
   subjects: string[]; // e.g. ["Mathematics", "Physics", "Chemistry"]
   monthlyFee: number; // default monthly tuition fee
   description?: string;
+  batchName?: string;
 }
 
 export interface Batch {
@@ -87,6 +91,9 @@ export interface Homework {
   instructions: string;
   publishDate: string; // ISO string
   deadlineDate: string; // ISO string
+  title?: string;
+  description?: string;
+  deadline?: string;
   maxMarks: number;
   priority: 'normal' | 'high' | 'urgent';
   attachments: HomeworkAttachment[];
