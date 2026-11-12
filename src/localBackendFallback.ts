@@ -344,6 +344,23 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     };
   }
 
+  if (pathname === '/api/auth/reset-password' && method === 'POST') {
+    const { email, phone, newPassword } = body;
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const uIdx = (store.users || []).findIndex(
+      (u: any) =>
+        u.email?.toLowerCase() === cleanEmail &&
+        (u.phone || '').replace(/\D/g, '').endsWith(cleanPhone.slice(-10))
+    );
+    if (uIdx === -1) {
+      throw makeHttpError(404, { error: 'No matching account found with that email and phone.' });
+    }
+    store.users[uIdx].passwordHash = newPassword;
+    saveStore(store);
+    return { message: 'Password reset successful! You can now log in.' };
+  }
+
   // ==================== SETTINGS & PUBLIC CONTENT ====================
   if (pathname === '/api/settings/public-content' && method === 'GET') {
     return {
@@ -697,6 +714,18 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     };
   }
 
+  if (pathname === '/api/owner/content' && method === 'PUT') {
+    store.settings = {
+      ...store.settings,
+      landingContent: { ...(store.settings?.landingContent || {}), ...(body.landingContent || body) }
+    };
+    saveStore(store);
+    return {
+      message: 'Website content updated successfully!',
+      landingContent: store.settings.landingContent
+    };
+  }
+
   if (pathname === '/api/owner/all-ui-texts' && method === 'PUT') {
     store.settings = {
       ...store.settings,
@@ -716,13 +745,22 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
   if (pathname === '/api/payments/quick-info' && method === 'GET') {
     return {
       classes: store.classes || [],
-      students: (store.students || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        rollNumber: s.rollNumber,
-        classId: s.classId,
-        phone: s.phone
-      })),
+      students: (store.students || []).map((s: any) => {
+        const cls = (store.classes || []).find((c: any) => c.id === s.classId);
+        return {
+          id: s.id,
+          name: s.name,
+          rollNumber: s.rollNumber,
+          classId: s.classId,
+          className: cls?.name || 'Class 10',
+          monthlyFee: s.customFee || cls?.monthlyFee || 2500,
+          phone: s.phone
+        };
+      }),
+      upiDetails: store.settings?.upiDetails || {
+        upiId: '9905847357@ybl',
+        accountName: 'AIHSAN ANSARI'
+      },
       upiId: '9905847357@ybl',
       merchantName: 'AIHSAN ANSARI'
     };
@@ -733,23 +771,188 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     if (!student) return { isExpired: true, pendingRequest: null };
     const mem = (store.memberships || []).find((m: any) => m.studentId === student.id);
     const now = Date.now();
-    const isExpired = !mem || mem.status !== 'active' || new Date(mem.expiryDate).getTime() <= now;
+    const expTime = mem?.expiryDate ? new Date(mem.expiryDate).getTime() : 0;
+    const isExpired = !mem || mem.status !== 'active' || expTime <= now;
     const pendingRequest = (store.payments || []).find(
       (p: any) => p.studentId === student.id && p.status === 'pending'
     );
     const latestRejectedRequest = (store.payments || []).find(
-      (p: any) => p.studentId === student.id && p.status === 'failed'
+      (p: any) => p.studentId === student.id && (p.status === 'rejected' || p.status === 'failed')
     );
     return {
       studentId: student.id,
+      studentName: student.name,
+      rollNumber: student.rollNumber,
       status: isExpired ? 'expired' : 'active',
       isExpired,
+      timeRemainingMs: isExpired ? 0 : Math.max(0, expTime - now),
       startDate: mem?.startDate || null,
       expiryDate: mem?.expiryDate || null,
       membership: mem || null,
       pendingRequest: pendingRequest || null,
       latestRejectedRequest: latestRejectedRequest || null
     };
+  }
+
+  if (pathname === '/api/payments/create-order' && method === 'POST') {
+    const student =
+      currentUser?.studentProfile ||
+      (store.students || []).find((s: any) => s.id === body.studentId) ||
+      (store.students || [])[0];
+    const cls = (store.classes || []).find((c: any) => c.id === student?.classId);
+    const feeAmount = student?.customFee || cls?.monthlyFee || 2500;
+    return {
+      orderId: `order_${Date.now()}`,
+      amount: feeAmount,
+      currency: 'INR',
+      studentId: student?.id,
+      studentName: student?.name,
+      rollNumber: student?.rollNumber,
+      className: cls?.name || 'Class 10',
+      billingMonth: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      keyId: 'rzp_test_PrernaTuition2026'
+    };
+  }
+
+  if (pathname === '/api/payments/verify' && method === 'POST') {
+    const student =
+      currentUser?.studentProfile ||
+      (store.students || []).find((s: any) => s.id === body.studentId) ||
+      (store.students || [])[0];
+    const approvalTime = new Date();
+    const startIso = approvalTime.toISOString();
+    const expiryIso = addOneCalendarMonth(approvalTime).toISOString();
+    const receiptNumber = `RCP-${approvalTime.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const cls = (store.classes || []).find((c: any) => c.id === student?.classId);
+    const feeAmount = student?.customFee || cls?.monthlyFee || 2500;
+
+    const newPayment = {
+      id: `pay_${Date.now()}`,
+      studentId: student.id,
+      studentName: student.name,
+      rollNumber: student.rollNumber,
+      classId: student.classId,
+      amount: feeAmount,
+      periodStart: startIso,
+      periodEnd: expiryIso,
+      status: 'success',
+      paymentMethod: 'razorpay',
+      receiptNumber,
+      createdAt: startIso
+    };
+    store.payments = [newPayment, ...(store.payments || [])];
+
+    const mIdx = (store.memberships || []).findIndex((m: any) => m.studentId === student.id);
+    if (mIdx !== -1) {
+      store.memberships[mIdx] = {
+        ...store.memberships[mIdx],
+        startDate: startIso,
+        expiryDate: expiryIso,
+        status: 'active',
+        lastPaymentDate: startIso.split('T')[0],
+        lastPaymentAmount: feeAmount
+      };
+    }
+
+    const newReceipt = {
+      receiptNumber,
+      paymentId: newPayment.id,
+      studentId: student.id,
+      studentName: student.name,
+      rollNumber: student.rollNumber,
+      className: cls?.name || 'Class 10',
+      batchName: 'Regular Batch',
+      billingMonth: approvalTime.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      amount: feeAmount,
+      paymentMethod: 'razorpay',
+      transactionId: body.razorpay_payment_id || newPayment.id,
+      paidAt: startIso,
+      receiptDate: startIso.split('T')[0]
+    };
+    store.receipts = [newReceipt, ...(store.receipts || [])];
+    saveStore(store);
+
+    return {
+      message: 'Payment verified successfully! Membership activated.',
+      payment: newPayment,
+      receipt: newReceipt,
+      newExpiryDate: expiryIso
+    };
+  }
+
+  if (pathname === '/api/payments/record-offline' && method === 'POST') {
+    const student = (store.students || []).find((s: any) => s.id === body.studentId);
+    if (!student) throw makeHttpError(404, { error: 'Student not found.' });
+    const now = new Date();
+    const startIso = now.toISOString();
+    const expiryIso = addOneCalendarMonth(now).toISOString();
+    const receiptNumber = `RCP-${now.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const feeAmount = Number(body.amount) || 2500;
+    const cls = (store.classes || []).find((c: any) => c.id === student.classId);
+
+    const newPayment = {
+      id: `pay_off_${Date.now()}`,
+      studentId: student.id,
+      studentName: student.name,
+      rollNumber: student.rollNumber,
+      classId: student.classId,
+      amount: feeAmount,
+      periodStart: startIso,
+      periodEnd: expiryIso,
+      status: 'success',
+      paymentMethod: body.paymentMethod || 'cash',
+      receiptNumber,
+      teacherNotes: body.teacherNotes || 'Manual offline payment',
+      createdAt: startIso
+    };
+    store.payments = [newPayment, ...(store.payments || [])];
+
+    const mIdx = (store.memberships || []).findIndex((m: any) => m.studentId === student.id);
+    if (mIdx !== -1) {
+      store.memberships[mIdx] = {
+        ...store.memberships[mIdx],
+        startDate: startIso,
+        expiryDate: expiryIso,
+        status: 'active',
+        lastPaymentDate: startIso,
+        lastPaymentAmount: feeAmount
+      };
+    }
+
+    const newReceipt = {
+      receiptNumber,
+      paymentId: newPayment.id,
+      studentId: student.id,
+      studentName: student.name,
+      rollNumber: student.rollNumber,
+      className: cls?.name || 'Class 10',
+      batchName: 'Regular Batch',
+      billingMonth: body.billingMonth || now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      amount: feeAmount,
+      paymentMethod: body.paymentMethod || 'cash',
+      transactionId: body.transactionRef || `OFFLINE-${receiptNumber}`,
+      paidAt: startIso,
+      receiptDate: startIso.split('T')[0],
+      teacherNotes: body.teacherNotes || 'Offline payment recorded'
+    };
+    store.receipts = [newReceipt, ...(store.receipts || [])];
+    saveStore(store);
+
+    return {
+      message: 'Offline payment recorded and receipt generated successfully!',
+      payment: newPayment,
+      receipt: newReceipt,
+      newExpiryDate: expiryIso
+    };
+  }
+
+  if ((pathname.startsWith('/api/payments/receipt/') || pathname.startsWith('/api/payments/public-receipt/')) && method === 'GET') {
+    const receiptNumber = decodeURIComponent(pathname.split('/')[4] || '');
+    const receipt = (store.receipts || []).find(
+      (r: any) => r.receiptNumber?.toUpperCase() === receiptNumber.toUpperCase()
+    );
+    if (!receipt) throw makeHttpError(404, { error: 'Receipt not found.' });
+    return { receipt, settings: store.settings };
   }
 
   if ((pathname === '/api/payments/submit-proof' || pathname === '/api/payments/public-deposit') && method === 'POST') {
@@ -762,7 +965,8 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
       (store.students || []).find(
         (s: any) =>
           s.id === body.studentId ||
-          (body.rollNumber && s.rollNumber.toLowerCase() === String(body.rollNumber).trim().toLowerCase())
+          (body.rollNumber && s.rollNumber.toLowerCase() === String(body.rollNumber).trim().toLowerCase()) ||
+          (body.phone && s.phone.replace(/\D/g, '') === String(body.phone).replace(/\D/g, ''))
       );
     if (!student) {
       throw makeHttpError(404, { error: 'Student account not found.' });
@@ -810,6 +1014,8 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
         classId: p.classId || st?.classId || 'cls_10',
         className: cls?.name || 'Class 10',
         currentExpiryDate: mem?.expiryDate || null,
+        currentStartDate: mem?.startDate || null,
+        currentMembershipStatus: mem?.status || 'expired',
         membershipStatus: mem?.status || 'expired'
       };
     };
@@ -830,7 +1036,7 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     const approvalTime = new Date();
     const startIso = approvalTime.toISOString();
     const expiryIso = addOneCalendarMonth(approvalTime).toISOString();
-    const receiptNumber = `PTA-RCP-${Math.floor(10000 + Math.random() * 90000)}`;
+    const receiptNumber = `RCP-${approvalTime.getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     store.payments[pIdx] = {
       ...payment,
@@ -881,13 +1087,13 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
       rollNumber: payment.rollNumber,
       className: cls?.name || 'Class 10',
       batchName: 'Regular Batch',
+      billingMonth: approvalTime.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
       amount: payment.amount,
       paymentMethod: payment.paymentMethod || 'upi',
-      transactionRef: payment.utrNumber || payment.id,
-      periodCovered: `${new Date(startIso).toLocaleDateString()} to ${new Date(expiryIso).toLocaleDateString()}`,
-      issuedAt: startIso,
-      tuitionName: store.settings?.tuitionName || 'Prerna Tuition Academy',
-      teacherSignature: 'AIHSAN ANSARI'
+      transactionId: payment.utrNumber || payment.id,
+      paidAt: startIso,
+      receiptDate: startIso.split('T')[0],
+      teacherNotes: `Verified & Approved by Admin. Active for 1 calendar month.`
     };
     store.receipts = [newReceipt, ...(store.receipts || [])];
     saveStore(store);
@@ -897,6 +1103,7 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
       message: `Approved! ${payment.studentName}'s subscription is now active for 1 calendar month.`,
       startDate: startIso,
       expiryDate: expiryIso,
+      newExpiryDate: expiryIso,
       payment: store.payments[pIdx],
       receipt: newReceipt
     };
@@ -909,7 +1116,7 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     const reason = (body.reason || '').toString().trim() || 'Payment verification failed.';
     store.payments[pIdx] = {
       ...store.payments[pIdx],
-      status: 'failed',
+      status: 'rejected',
       adminRemarks: reason,
       rejectedAt: new Date().toISOString()
     };
@@ -983,6 +1190,19 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     return { homework: enriched };
   }
 
+  if (pathname.startsWith('/api/homework/') && pathname.split('/').length === 4 && method === 'GET') {
+    const hwId = decodeURIComponent(pathname.split('/')[3]);
+    const hw = (store.homework || []).find((h: any) => h.id === hwId);
+    if (!hw) throw makeHttpError(404, { error: 'Homework not found.' });
+    const subs = (store.submissions || []).filter((s: any) => s.homeworkId === hw.id);
+    const studentsInClass = (store.students || []).filter((s: any) => s.classId === hw.classId);
+    return {
+      homework: hw,
+      submissions: subs,
+      studentsInClass
+    };
+  }
+
   if (pathname === '/api/homework' && method === 'POST') {
     const nowIso = new Date().toISOString();
     const cls = (store.classes || []).find((c: any) => c.id === body.classId);
@@ -1011,8 +1231,40 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     return { message: 'Homework published!', homework: newHw };
   }
 
+  if (pathname.startsWith('/api/homework/') && pathname.endsWith('/duplicate') && method === 'POST') {
+    const hwId = decodeURIComponent(pathname.split('/')[3]);
+    const orig = (store.homework || []).find((h: any) => h.id === hwId);
+    if (!orig) throw makeHttpError(404, { error: 'Homework not found.' });
+    const nowIso = new Date().toISOString();
+    const copy = {
+      ...orig,
+      id: `hw_${Date.now()}`,
+      topic: `${orig.topic} (Copy)`,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    };
+    store.homework = [copy, ...(store.homework || [])];
+    saveStore(store);
+    return { message: 'Homework duplicated!', homework: copy };
+  }
+
+  if (pathname.startsWith('/api/homework/submissions/') && pathname.endsWith('/grade') && method === 'PUT') {
+    const subId = decodeURIComponent(pathname.split('/')[4]);
+    const idx = (store.submissions || []).findIndex((s: any) => s.id === subId);
+    if (idx !== -1) {
+      store.submissions[idx] = {
+        ...store.submissions[idx],
+        status: body.status || 'completed',
+        marksAwarded: body.marksAwarded,
+        teacherFeedback: body.teacherFeedback
+      };
+      saveStore(store);
+    }
+    return { message: 'Submission graded!', submission: store.submissions[idx] };
+  }
+
   if (pathname.startsWith('/api/homework/') && !pathname.endsWith('/submit') && method === 'PUT') {
-    const hwId = pathname.split('/')[3];
+    const hwId = decodeURIComponent(pathname.split('/')[3]);
     const idx = (store.homework || []).findIndex((h: any) => h.id === hwId);
     if (idx === -1) throw makeHttpError(404, { error: 'Homework not found.' });
     const existing = store.homework[idx];
@@ -1036,7 +1288,7 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
   }
 
   if (pathname.startsWith('/api/homework/') && pathname.endsWith('/submit') && method === 'POST') {
-    const hwId = pathname.split('/')[3];
+    const hwId = decodeURIComponent(pathname.split('/')[3]);
     const student = currentUser?.studentProfile;
     if (!student) throw makeHttpError(403, { error: 'Student profile required.' });
     const newSub = {
@@ -1062,21 +1314,149 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
   if (pathname === '/api/students' && method === 'GET') {
     const list = (store.students || []).map((s: any) => {
       const cls = (store.classes || []).find((c: any) => c.id === s.classId);
+      const batch = (store.batches || []).find((b: any) => b.id === s.batchId);
       const mem = (store.memberships || []).find((m: any) => m.studentId === s.id);
       return {
         ...s,
         className: cls?.name || 'Class 10',
+        batchName: batch?.name || 'Regular Batch',
         membership: mem || null
       };
     });
     return { students: list };
   }
 
-  if (pathname === '/api/attendance' && method === 'GET') {
-    return {
-      records: store.attendance || [],
-      summary: { totalDays: 24, presentDays: 22, absentDays: 2, lateDays: 0, percentage: 91.7 }
+  if (pathname === '/api/students' && method === 'POST') {
+    const nowIso = new Date().toISOString();
+    const userId = `usr_${Date.now()}`;
+    const studentId = `stu_${Date.now()}`;
+    const rollNumber = body.rollNumber || `PTA-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newUser = {
+      id: userId,
+      email: (body.email || '').trim().toLowerCase(),
+      name: (body.name || '').trim(),
+      phone: body.phone || '',
+      role: 'student',
+      passwordHash: body.password || 'student123',
+      loginAccessGranted: true,
+      createdAt: nowIso
     };
+    const newStudent = {
+      id: studentId,
+      userId,
+      name: (body.name || '').trim(),
+      email: (body.email || '').trim().toLowerCase(),
+      phone: body.phone || '',
+      rollNumber,
+      classId: body.classId || 'cls_10',
+      batchId: body.batchId || 'all',
+      guardianName: body.guardianName || 'Parent',
+      guardianPhone: body.guardianPhone || '',
+      guardianRelation: body.guardianRelation || 'Parent',
+      enrollmentDate: nowIso.split('T')[0],
+      status: 'active',
+      loginAccessGranted: true,
+      customFee: body.customFee ? Number(body.customFee) : undefined
+    };
+    const newMem = {
+      id: `mem_${Date.now()}`,
+      studentId,
+      startDate: nowIso,
+      expiryDate: addOneCalendarMonth(new Date()).toISOString(),
+      status: 'active',
+      autoRenew: false,
+      gracePeriodDays: 3
+    };
+    store.users.push(newUser);
+    store.students.push(newStudent);
+    store.memberships.push(newMem);
+    saveStore(store);
+    return { message: 'Student enrolled!', student: newStudent };
+  }
+
+  if (pathname.startsWith('/api/students/') && pathname.endsWith('/history') && method === 'GET') {
+    const sid = pathname.split('/')[3];
+    const student = (store.students || []).find((s: any) => s.id === sid);
+    const payments = (store.payments || []).filter((p: any) => p.studentId === sid);
+    const receipts = (store.receipts || []).filter((r: any) => r.studentId === sid);
+    const attendance = (store.attendance || []).filter((a: any) => a.studentId === sid);
+    const submissions = (store.submissions || []).filter((s: any) => s.studentId === sid);
+    return { student, payments, receipts, attendance, submissions };
+  }
+
+  if (pathname.startsWith('/api/students/') && pathname.endsWith('/status') && method === 'PUT') {
+    const sid = pathname.split('/')[3];
+    const sIdx = (store.students || []).findIndex((s: any) => s.id === sid);
+    if (sIdx !== -1) {
+      store.students[sIdx].status = body.status || store.students[sIdx].status;
+      saveStore(store);
+    }
+    return { message: 'Status updated!' };
+  }
+
+  if (pathname.startsWith('/api/students/') && method === 'PUT') {
+    const sid = pathname.split('/')[3];
+    const sIdx = (store.students || []).findIndex((s: any) => s.id === sid);
+    if (sIdx !== -1) {
+      store.students[sIdx] = { ...store.students[sIdx], ...body };
+      saveStore(store);
+    }
+    return { message: 'Student updated!', student: store.students[sIdx] };
+  }
+
+  if (pathname.startsWith('/api/students/') && method === 'DELETE') {
+    const sid = pathname.split('/')[3];
+    store.students = (store.students || []).filter((s: any) => s.id !== sid);
+    saveStore(store);
+    return { message: 'Student removed!' };
+  }
+
+  if (pathname === '/api/attendance' && method === 'GET') {
+    const records = store.attendance || [];
+    return {
+      attendance: records,
+      records,
+      summary: { totalClasses: 24, totalDays: 24, present: 22, presentDays: 22, absent: 2, absentDays: 2, late: 0, lateDays: 0, percentage: 92 }
+    };
+  }
+
+  if (pathname === '/api/attendance/batch-record' && method === 'POST') {
+    const { date, classId, batchId, entries = [] } = body;
+    const nowIso = new Date().toISOString();
+    const newRecords = entries.map((e: any) => ({
+      id: `att_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      date,
+      classId,
+      batchId: batchId || 'all',
+      studentId: e.studentId,
+      status: e.status,
+      remarks: e.remarks || '',
+      recordedAt: nowIso
+    }));
+    store.attendance = [...(store.attendance || []), ...newRecords];
+    saveStore(store);
+    return { message: `Attendance recorded for ${newRecords.length} students.`, records: newRecords };
+  }
+
+  if (pathname === '/api/attendance/compliance' && method === 'GET') {
+    const complianceList = (store.students || []).map((s: any) => ({
+      studentId: s.id,
+      name: s.name,
+      rollNumber: s.rollNumber,
+      phone: s.phone,
+      guardianName: s.guardianName,
+      guardianPhone: s.guardianPhone,
+      classId: s.classId,
+      batchId: s.batchId,
+      totalAssignedHw: 5,
+      submittedHwCount: 4,
+      missingHwCount: 1,
+      missingHwList: [],
+      attendancePercentage: 92,
+      absentDays: 1,
+      lateDays: 0
+    }));
+    return { complianceList };
   }
 
   if (pathname === '/api/reports/dashboard' && method === 'GET') {
@@ -1122,6 +1502,22 @@ export async function handleLocalApiFallback(endpoint: string, options: RequestI
     store.inquiries = [newInq, ...(store.inquiries || [])];
     saveStore(store);
     return { message: 'Inquiry submitted!', inquiry: newInq };
+  }
+
+  if (pathname.startsWith('/api/inquiries/') && pathname.endsWith('/status') && method === 'PUT') {
+    const inqId = pathname.split('/')[3];
+    store.inquiries = (store.inquiries || []).map((i: any) =>
+      i.id === inqId ? { ...i, status: body.status } : i
+    );
+    saveStore(store);
+    return { message: 'Inquiry status updated!' };
+  }
+
+  if (pathname.startsWith('/api/inquiries/') && method === 'DELETE') {
+    const inqId = pathname.split('/')[3];
+    store.inquiries = (store.inquiries || []).filter((i: any) => i.id !== inqId);
+    saveStore(store);
+    return { message: 'Inquiry deleted!' };
   }
 
   return {};

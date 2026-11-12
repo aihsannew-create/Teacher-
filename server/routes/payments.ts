@@ -30,7 +30,7 @@ router.post('/create-order', requireAuth, (req: AuthenticatedRequest, res: Respo
   const user = req.user!;
   let student: StudentProfile | undefined;
 
-  if (user.role === 'teacher') {
+  if (user.role === 'teacher' || user.role === 'owner') {
     const { studentId } = req.body;
     student = db.get('students').find(s => s.id === studentId);
   } else {
@@ -87,7 +87,7 @@ router.post('/verify', requireAuth, (req: AuthenticatedRequest, res: Response) =
 
   // Target student check
   let student: StudentProfile | undefined;
-  if (user.role === 'teacher' && studentId) {
+  if ((user.role === 'teacher' || user.role === 'owner') && studentId) {
     student = db.get('students').find(s => s.id === studentId);
   } else {
     student = user.studentProfile;
@@ -407,7 +407,7 @@ router.get('/history', requireAuth, (req: AuthenticatedRequest, res: Response) =
   const payments = db.get('payments');
   const receipts = db.get('receipts');
 
-  if (user.role === 'teacher') {
+  if (user.role === 'teacher' || user.role === 'owner') {
     const { studentId, search } = req.query;
     let list = payments;
     if (studentId && typeof studentId === 'string' && studentId !== 'all') {

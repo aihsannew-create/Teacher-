@@ -41,20 +41,20 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
   const isExpressBackend = response.headers.get('X-Prerna-Api') === '1';
   const contentType = response.headers.get('content-type') || '';
 
-  // If deployed to static hosting (GitHub Pages / Vercel / Netlify / static preview) where /api/* returns 404/405/502/503
+  // If deployed to static hosting (GitHub Pages / Vercel / Netlify / static preview) where /api/* returns 404/405/5xx or SPA HTML
   if (
-    !response.ok &&
-    !isExpressBackend &&
-    (response.status === 404 || response.status === 405 || response.status === 502 || response.status === 503 || !contentType.includes('application/json'))
+    !isExpressBackend ||
+    !contentType.includes('application/json') ||
+    (url.startsWith('/api/auth/') && (response.status === 404 || response.status === 405 || response.status >= 500))
   ) {
     return handleLocalApiFallback(url, { ...options, headers });
   }
 
   let data: any;
-  if (contentType.includes('application/json')) {
+  try {
     data = await response.json();
-  } else {
-    data = await response.text();
+  } catch {
+    return handleLocalApiFallback(url, { ...options, headers });
   }
 
   if (!response.ok) {

@@ -36,9 +36,11 @@ import { TeacherReports } from './pages/TeacherReports';
 import { TeacherSettingsPage } from './pages/TeacherSettings';
 
 import { ArrowLeft } from 'lucide-react';
+import { OpeningSplashScreen } from './components/OpeningSplashScreen';
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [currentView, setCurrentView] = useState<string>('landing');
   const [history, setHistory] = useState<string[]>(['landing']);
   const [navigationExtra, setNavigationExtra] = useState<any>(null);
@@ -87,15 +89,6 @@ function AppContent() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-500 space-y-3">
-        <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-semibold text-slate-700">Starting Prerna Tuition OS...</p>
-      </div>
-    );
-  }
-
   // Readable breadcrumb title for the current view
   const getViewTitle = (view: string) => {
     switch (view) {
@@ -126,6 +119,12 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+      {/* Cinematic Opening Splash & Loading Screen */}
+      <OpeningSplashScreen
+        isVisible={showSplash || loading}
+        onComplete={() => setShowSplash(false)}
+      />
+
       {/* Main Responsive Navbar */}
       <Navbar
         currentView={currentView}

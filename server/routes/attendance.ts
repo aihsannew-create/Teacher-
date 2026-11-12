@@ -13,7 +13,7 @@ router.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
   let records = db.get('attendance');
 
-  if (user.role === 'teacher') {
+  if (user.role === 'teacher' || user.role === 'owner') {
     if (date && typeof date === 'string') {
       records = records.filter(r => r.date === date);
     }
